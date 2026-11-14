@@ -1,197 +1,430 @@
-// Owner: Hazel · Support: Celene
-// App entry: loads dataset configs, builds the jukebox list, wires controls and shortcuts.
+import { initLanding } from './landing.js';
+import { formatTime } from './a11y.js';
+import { fixtures, modeCopy } from './presentation.js';
 
-import { initAudio, loadDataset, releaseAll, setVolume } from './sound/engine.js';
-import * as player from './player.js';
-import { announce, speak, formatTime } from './a11y.js';
-
-const MODES = ['play', 'scan', 'explore'];
-const SCRUB_STEP = 5;   // seconds for ←/→
-const VOLUME_STEP = 2;  // dB for ↑/↓
-
+const byId = (id) => document.getElementById(id);
+const stage = byId('stage');
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const clock = () => ({ elapsed: 0, running: false, duration: 0 });
+const player = clock();
+const symphony = clock();
+const state = { view: 'home', mode: 'play', volume: 75, muted: false, cell: null };
 let datasets = [];
-let current = null;
-let mode = 'play';
+let dataset;
+let mediaState = 'loading';
 
-const $ = (id) => document.getElementById(id);
-
-// ---- audio unlock: browsers only allow sound after a user gesture ----
-async function ensureAudio() {
-  await initAudio();
-  setVolume(Number($('volume').value));
-}
-window.addEventListener('pointerdown', ensureAudio, { once: true });
-window.addEventListener('keydown', ensureAudio, { once: true });
-
-// ---- datasets ----
-async function loadDatasets() {
-  const files = await (await fetch('datasets/index.json')).json();
-  datasets = await Promise.all(files.map(async (f) => (await fetch(`datasets/${f}`)).json()));
-  buildList();
+function announce(message) {
+  byId('status').textContent = message;
 }
 
-function buildList() {
-  const list = $('dataset-list');
-  list.innerHTML = '';
-  datasets.forEach((cfg, i) => {
-    const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.index = i;
-    btn.setAttribute('aria-current', 'false');
-    btn.innerHTML = `<span class="key" aria-hidden="true">${i + 1}</span>`;
-    btn.append(cfg.title);
-    btn.addEventListener('click', () => selectDataset(i));
-    li.append(btn);
-    list.append(li);
+function mediaSurface(container, data, video = false) {
+  container.replaceChildren();
+  const message = document.createElement('span');
+  message.className = 'media-state';
+  const show = (status) => {
+    container.dataset.state = status;
+    message.textContent = status === 'loading' ? 'Loading visualization…'
+      : status === 'missing' ? (video ? 'Video not found' : 'Preview unavailable') : 'NASA preview';
+    if (video) mediaState = status;
+  };
+  show('loading');
+  const image = document.createElement('img');
+  image.alt = data.title + ' visualization';
+  image.addEventListener('load', () => {
+    if (!video || !data.video) show(video ? 'missing' : 'ready');
   });
-  // TODO(Hazel): add a "Planet Symphony" entry that layers all four datasets at once.
-}
-
-function selectDataset(i) {
-  const cfg = datasets[i];
-  if (!cfg) return;
-  current = cfg;
-
-  document.querySelectorAll('#dataset-list button').forEach((b) => {
-    b.setAttribute('aria-current', String(Number(b.dataset.index) === i));
+  image.addEventListener('error', () => {
+    image.hidden = true;
+    if (!video || !data.video) show('missing');
   });
-  $('now-playing').textContent = cfg.title;
-  $('description').textContent = cfg.description;
-  $('legend').innerHTML = cfg.legend.map((l) => `<li><strong>${l.sound}</strong>: ${l.means}</li>`).join('');
-  $('mapping').textContent = mappingText(cfg);
-  $('readout').textContent = '—';
-
-  player.load(cfg);
-  loadDataset(cfg);
-  updatePlayButton();
-  announce(`${cfg.title} selected. Press Space to play.`);
+  if (data.preview) image.src = data.preview;
+  else {
+    image.hidden = true;
+    if (!video || !data.video) show('missing');
+  }
+  container.append(image, message);
+  if (!video || !data.video) return;
+  const clip = document.createElement('video');
+  clip.preload = 'metadata';
+  clip.muted = true;
+  clip.playsInline = true;
+  clip.hidden = true;
+  clip.addEventListener('loadedmetadata', () => {
+    if (clip.isConnected) {
+      if (state.mode === 'play' && Number.isFinite(clip.duration)) player.duration = clip.duration;
+      show('ready');
+      renderMode();
+      updateControls();
+    }
+  });
+  clip.addEventListener('error', () => {
+    if (clip.isConnected) show('missing');
+  });
+  container.prepend(clip);
+  clip.src = data.video;
 }
 
-function mappingText(cfg) {
-  // TODO(Celene): replace with a hand-written explanation per dataset (could live in the config).
-  const s = cfg.sound;
-  return `Each frame is split into a ${cfg.grid.w} by ${cfg.grid.h} grid. Colours are turned back into ` +
-    `${cfg.colorbar.unit} using the colorbar, then mapped to ${s.valueTo} on a ${s.instrument ?? s.instruments?.join(', ')} ` +
-    `sound in ${s.scale}.`;
+function renderLibrary() {
+  byId('datasets').replaceChildren(...datasets.map((data) => {
+    const entry = document.createElement('li');
+    const button = document.createElement('button');
+    button.style.setProperty('--track', data.accent);
+    button.dataset.dataset = data.id;
+    button.innerHTML = '<span class="track-dot" aria-hidden="true"></span><span class="track-copy"><strong></strong><small></small><span></span></span>';
+    button.querySelector('strong').textContent = data.title;
+    button.querySelector('small').textContent = data.dates;
+    button.querySelector('.track-copy > span').textContent = data.description;
+    button.addEventListener('click', () => selectDataset(data));
+    entry.append(button);
+    return entry;
+  }));
 }
 
-// ---- controls ----
-async function togglePlay() {
-  if (!current) { announce('Choose a dataset first.'); return; }
-  await ensureAudio();
-  if (player.isPlaying()) {
-    player.pause();
-    announce('Paused');
+function selectDataset(data) {
+  dataset = data;
+  Object.assign(player, clock(), { duration: state.mode === 'scan' ? 12 : data.duration });
+  state.cell = null;
+  document.documentElement.style.setProperty('--accent', data.accent);
+  document.querySelectorAll('[data-dataset]').forEach((button) => {
+    button.setAttribute('aria-current', String(button.dataset.dataset === data.id));
+  });
+  byId('dataset-title').textContent = data.title;
+  byId('dataset-dates').textContent = data.dates;
+  byId('description').textContent = data.description;
+  byId('play-summary-title').textContent = data.title;
+  byId('play-summary-dates').textContent = data.dates;
+  byId('play-summary-description').textContent = data.description;
+  byId('dataset-notes').disabled = false;
+  byId('mapping').textContent = data.mapping;
+  byId('source').hidden = !data.source;
+  if (data.source) byId('source').href = data.source;
+  byId('legend-preview').hidden = true;
+  byId('legend-button').setAttribute('aria-expanded', 'false');
+  byId('legend').replaceChildren(...data.legend.map(({ sound, means }) => {
+    const item = document.createElement('li');
+    const label = document.createElement('strong');
+    label.textContent = sound;
+    item.append(label, document.createTextNode(means));
+    return item;
+  }));
+  mediaSurface(byId('media'), data, true);
+  renderMode();
+  announce(data.title + ' selected');
+}
+
+function renderReadout() {
+  const explore = state.mode === 'explore';
+  const cell = state.cell;
+  const sample = explore ? dataset.cells?.[cell?.join(',')] : dataset.readout;
+  const available = sample?.value != null;
+  const card = byId('readout');
+  card.innerHTML = '<h3></h3><p class="eyebrow"></p><strong class="measurement"></strong><p class="measurement-detail"></p>';
+  card.querySelector('h3').textContent = explore ? 'Selected location' : 'Live readout';
+  card.querySelector('.eyebrow').textContent = 'Preview data';
+  const unit = sample?.unit ?? (explore ? dataset.colorbar?.unit : '');
+  card.querySelector('.measurement').textContent = available
+    ? [sample.value, unit].filter((part) => part !== '' && part != null).join(' ')
+    : explore && !cell ? 'Choose a cell' : 'Unavailable';
+  card.querySelector('.measurement-detail').textContent = explore && cell
+    ? [sample?.location ?? ('Column ' + (cell[0] + 1) + ' · Row ' + (cell[1] + 1)), sample?.hotspot ? 'Hotspot' : ''].filter(Boolean).join(' · ')
+    : sample?.timestamp ?? sample?.label ?? '';
+  if (!explore && sample?.timestamp && sample.label) {
+    card.querySelector('.measurement-detail').textContent = sample.label + ' · ' + sample.timestamp;
+  }
+}
+
+function renderMode() {
+  const explore = state.mode === 'explore';
+  const scan = state.mode === 'scan';
+  const clip = byId('media').querySelector('video');
+  const image = byId('media').querySelector('img');
+  if (clip && mediaState === 'ready') {
+    clip.hidden = state.mode !== 'play';
+    image.hidden = !clip.hidden || !image.getAttribute('src') || (image.complete && !image.naturalWidth);
+  }
+  stage.classList.toggle('exploring', explore);
+  if (explore) {
+    stage.tabIndex = 0;
+    stage.setAttribute('role', 'group');
+    stage.setAttribute('aria-label', 'Explore map');
+    stage.setAttribute('aria-describedby', 'instruction');
   } else {
-    await player.play();
+    ['tabindex', 'role', 'aria-label', 'aria-describedby'].forEach((attribute) => stage.removeAttribute(attribute));
   }
-  updatePlayButton();
+  byId('instruction').textContent = modeCopy[state.mode];
+  byId('scan-line').hidden = !scan;
+  const cursor = byId('cursor');
+  cursor.hidden = !explore;
+  const [x, y] = state.cell ?? [16, 8];
+  cursor.style.left = (x + 0.5) / dataset.grid.w * 100 + '%';
+  cursor.style.top = (y + 0.5) / dataset.grid.h * 100 + '%';
+  cursor.classList.toggle('hotspot', Boolean(dataset.cells?.[state.cell?.join(',')]?.hotspot));
+  byId('player-controls').hidden = explore;
+  document.querySelectorAll('[data-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
+  });
+  renderReadout();
+  updateControls();
 }
 
-function updatePlayButton() {
-  const btn = $('play-btn');
-  const label = player.isPlaying() ? 'Pause' : 'Play';
-  btn.textContent = label;
-  btn.setAttribute('aria-label', label);
+function buildControls(container, playback, name) {
+  container.innerHTML = '<div class="transport"><button class="primary" data-action="toggle"></button><label class="timeline"><span></span><input type="range" min="0" step="0.1" value="0"></label><output></output></div><div class="volume"><button data-action="mute"></button><label>Volume <input type="range" min="0" max="100" value="75"></label></div>';
+  container.setAttribute('role', 'group');
+  container.setAttribute('aria-label', name + ' controls');
+  const toggle = container.querySelector('[data-action="toggle"]');
+  const timeline = container.querySelector('.timeline input');
+  const mute = container.querySelector('[data-action="mute"]');
+  const volume = container.querySelector('.volume input');
+  toggle.addEventListener('click', () => {
+    if (playback.elapsed >= playback.duration) playback.elapsed = 0;
+    playback.running = !playback.running;
+    updateControls();
+    announce(toggle.textContent);
+  });
+  timeline.addEventListener('input', () => {
+    playback.elapsed = Number(timeline.value);
+    updateControls();
+  });
+  mute.addEventListener('click', () => {
+    state.muted = !state.muted;
+    updateControls();
+  });
+  volume.addEventListener('input', () => {
+    state.volume = Number(volume.value);
+    state.muted = false;
+    updateControls();
+  });
 }
 
-function setMode(m) {
-  mode = m;
-  document.querySelectorAll('.mode-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
-  player.setMode(m);
-  announce(`${m[0].toUpperCase()}${m.slice(1)} mode`);
-}
-
-function scrubBy(dt) {
-  player.seek(player.currentTime() + dt);
-  updateTime();
-}
-
-function changeVolume(delta) {
-  const v = $('volume');
-  v.value = Math.min(Number(v.max), Math.max(Number(v.min), Number(v.value) + delta));
-  onVolume();
-  announce(`Volume ${v.value} decibels`);
-}
-
-function onVolume() {
-  const v = $('volume');
-  v.setAttribute('aria-valuetext', `${v.value} decibels`);
-  setVolume(Number(v.value));
-}
-
-function playLegend() {
-  if (!current) { announce('Choose a dataset first.'); return; }
-  const text = current.legend.map((l) => `${l.sound} means ${l.means}`).join('. ');
-  speak(text);
-  announce(text);
-  // TODO(Freia): play an example of each sound while its line is spoken.
-}
-
-function describeNow() {
-  speak($('readout').textContent);
-}
-
-function stopAll() {
-  player.pause();
-  releaseAll();
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
-  updatePlayButton();
-  announce('Stopped');
-}
-
-function updateTime() {
-  const t = player.currentTime();
-  const d = player.duration();
-  const scrub = $('scrub');
-  scrub.max = d || 100;
-  scrub.value = t;
-  const text = `${formatTime(t)} of ${formatTime(d)}`;
-  scrub.setAttribute('aria-valuetext', text);
-  $('time').textContent = `${formatTime(t)} / ${formatTime(d)}`;
-}
-
-function wireControls() {
-  $('play-btn').addEventListener('click', togglePlay);
-  document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
-  $('scrub').addEventListener('input', (e) => { player.seek(Number(e.target.value)); updateTime(); });
-  $('volume').addEventListener('input', onVolume);
-  $('legend-btn').addEventListener('click', playLegend);
-  $('video').addEventListener('timeupdate', updateTime);
-  $('video').addEventListener('loadedmetadata', updateTime);
-  setInterval(() => { if (player.isPlaying()) updateTime(); }, 500); // also covers the no-video clock
-}
-
-// ---- keyboard shortcuts ----
-function onKey(e) {
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const tag = e.target.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-    if (e.key !== 'Escape') return; // let sliders use their own arrow keys
+function updateControls() {
+  for (const [id, playback] of [['player-controls', player], ['symphony-controls', symphony]]) {
+    const container = byId(id);
+    const scan = playback === player && state.mode === 'scan';
+    const progress = playback.duration ? playback.elapsed / playback.duration : 0;
+    const complete = progress >= 1;
+    const percent = Math.round(progress * 100);
+    container.querySelector('[data-action="toggle"]').textContent = scan
+      ? playback.running ? 'Pause scan' : complete ? 'Scan again' : playback.elapsed ? 'Resume scan' : 'Start scan'
+      : playback.running ? 'Pause preview' : 'Play preview';
+    const timeline = container.querySelector('.timeline input');
+    timeline.max = playback.duration || 1;
+    timeline.value = playback.elapsed;
+    const time = formatTime(playback.elapsed) + ' / ' + formatTime(playback.duration);
+    timeline.setAttribute('aria-valuetext', scan ? percent + '%' : time);
+    container.querySelector('.timeline span').textContent = scan ? 'Scan progress' : 'Timeline';
+    container.querySelector('output').textContent = scan
+      ? (complete ? 'Complete' : playback.running ? 'Scanning' : playback.elapsed ? 'Paused' : 'Ready') + ' · ' + percent + '%'
+      : time;
+    const mute = container.querySelector('[data-action="mute"]');
+    mute.textContent = state.muted ? 'Unmute' : 'Mute';
+    container.querySelector('.volume input').value = state.volume;
+    if (scan) {
+      const position = reducedMotion.matches && playback.running ? 0 : Math.min(percent, 99.5);
+      byId('scan-line').style.left = position + '%';
+    }
   }
-
-  switch (e.key) {
-    case ' ':
-      if (tag === 'BUTTON' || tag === 'SUMMARY') return; // Space activates the focused button
-      e.preventDefault(); togglePlay(); break;
-    case 'ArrowLeft': e.preventDefault(); scrubBy(-SCRUB_STEP); break;
-    case 'ArrowRight': e.preventDefault(); scrubBy(SCRUB_STEP); break;
-    case 'ArrowUp': e.preventDefault(); changeVolume(VOLUME_STEP); break;
-    case 'ArrowDown': e.preventDefault(); changeVolume(-VOLUME_STEP); break;
-    case '1': case '2': case '3': case '4': selectDataset(Number(e.key) - 1); break;
-    case 'm': case 'M': setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]); break;
-    case 'l': case 'L': playLegend(); break;
-    case 'd': case 'D': describeNow(); break;
-    case 'Escape': stopAll(); break;
-    default: return;
+  const clip = byId('media').querySelector('video');
+  if (clip && mediaState === 'ready' && !clip.hidden && Math.abs(clip.currentTime - player.elapsed) > 0.45) {
+    clip.currentTime = player.elapsed;
   }
 }
 
-// ---- start ----
-wireControls();
-document.addEventListener('keydown', onKey);
-loadDatasets().catch((err) => {
-  console.error('Could not load datasets', err);
-  $('dataset-list').innerHTML = '<li>Could not load datasets. Serve this folder over http (e.g. Live Server), not file://.</li>';
+function selectCell(x, y) {
+  state.cell = [Math.max(0, Math.min(dataset.grid.w - 1, x)), Math.max(0, Math.min(dataset.grid.h - 1, y))];
+  renderMode();
+  announce(byId('readout').textContent);
+}
+
+stage.addEventListener('click', (event) => {
+  if (state.mode !== 'explore') return;
+  const bounds = stage.getBoundingClientRect();
+  selectCell(Math.floor((event.clientX - bounds.left) / bounds.width * dataset.grid.w),
+    Math.floor((event.clientY - bounds.top) / bounds.height * dataset.grid.h));
+});
+
+stage.addEventListener('keydown', (event) => {
+  const offset = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+  if (!offset || state.mode !== 'explore') return;
+  event.preventDefault();
+  const [x, y] = state.cell ?? [16, 8];
+  selectCell(x + offset[0], y + offset[1]);
+});
+
+const routes = ['home', 'play', 'scan', 'explore', 'symphony'];
+const landing = initLanding();
+
+function navigate() {
+  const requested = location.hash.slice(1);
+  const route = routes.includes(requested) ? requested : 'home';
+  state.view = route === 'home' || route === 'symphony' ? route : 'jukebox';
+  if (state.view === 'jukebox' && state.mode !== route) {
+    state.mode = route;
+    const clip = byId('media').querySelector('video');
+    const duration = Number.isFinite(clip?.duration) ? clip.duration : dataset?.duration;
+    Object.assign(player, clock(), { duration: route === 'scan' ? 12 : duration ?? 0 });
+  }
+  player.running = false;
+  symphony.running = false;
+  byId('home').hidden = route !== 'home';
+  byId('home-details').hidden = route !== 'home';
+  document.body.classList.toggle('home-active', route === 'home');
+  document.body.classList.toggle('jukebox-active', state.view === 'jukebox');
+  document.body.classList.toggle('play-console', route === 'play');
+  playNotes.forEach((note) => {
+    note.classList.remove('note-visible');
+    noteObserver.unobserve(note);
+    if (route === 'play') noteObserver.observe(note);
+  });
+  byId('legend-button').removeAttribute('aria-haspopup');
+  if (route === 'play') byId('legend-button').setAttribute('aria-haspopup', 'dialog');
+  if (route !== 'play' && byId('play-dialog').open) byId('play-dialog').close();
+  const intro = document.querySelector('.intro');
+  intro.hidden = route === 'home' || route === 'play';
+  document.querySelector('.play-summary').hidden = route !== 'play';
+  byId('intro-heading').textContent = {
+    play: 'Listen to the planet.',
+    scan: 'Sweep across Earth.',
+    explore: 'Explore a location.',
+    symphony: 'Hear Earth together.',
+  }[route] ?? 'Listen to the planet.';
+  byId('jukebox').hidden = state.view !== 'jukebox';
+  byId('symphony').hidden = route !== 'symphony';
+  document.querySelectorAll('#site-navigation a').forEach((link) => {
+    if (link.hash === '#' + route) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+  landing.setVisible(route === 'home');
+  if (dataset && state.view === 'jukebox') renderMode();
+  updateControls();
+}
+
+document.querySelectorAll('[data-mode]').forEach((button) => {
+  button.addEventListener('click', () => { location.hash = button.dataset.mode; });
+});
+
+window.addEventListener('hashchange', () => {
+  const previousFocus = document.activeElement;
+  navigate();
+  window.scrollTo(0, 0);
+  if (previousFocus?.closest('#main [hidden]')) byId('main').focus();
+});
+
+const playDialog = byId('play-dialog');
+
+function showPlayDialog(title, ...content) {
+  byId('play-dialog-title').textContent = title;
+  byId('play-dialog-content').replaceChildren(...content);
+  playDialog.showModal();
+}
+
+byId('dataset-notes').addEventListener('click', () => {
+  const description = document.createElement('p');
+  description.textContent = dataset.description;
+  const dates = document.createElement('p');
+  dates.className = 'eyebrow';
+  dates.textContent = dataset.dates;
+  const source = byId('source').cloneNode(true);
+  source.removeAttribute('id');
+  showPlayDialog(dataset.title, dates, description, source);
+});
+
+byId('legend-button').addEventListener('click', () => {
+  if (!dataset) return;
+  if (state.view === 'jukebox' && state.mode === 'play') {
+    const legend = byId('legend').cloneNode(true);
+    legend.removeAttribute('id');
+    showPlayDialog('Sonic legend', legend);
+    return;
+  }
+  const preview = byId('legend-preview');
+  preview.hidden = !preview.hidden;
+  preview.textContent = dataset.legend.map(({ sound, means }) => sound + ' means ' + means).join('. ') + '.';
+  byId('legend-button').setAttribute('aria-expanded', String(!preview.hidden));
+});
+
+function renderTiles() {
+  byId('tiles').replaceChildren(...datasets.map((data) => {
+    const tile = document.createElement('article');
+    tile.className = 'panel tile';
+    tile.dataset.datasetId = data.id;
+    tile.innerHTML = '<div class="stage media"></div><div class="tile-copy"><h4></h4><p></p></div>';
+    tile.querySelector('h4').textContent = data.title;
+    tile.querySelector('p').textContent = data.instrument ?? '';
+    tile.style.setProperty('--track', data.accent);
+    mediaSurface(tile.querySelector('.media'), data);
+    return tile;
+  }));
+}
+
+buildControls(byId('player-controls'), player, 'Dataset preview');
+buildControls(byId('symphony-controls'), symphony, 'Symphony preview');
+
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const playback = state.view === 'jukebox' ? player : symphony;
+  if (playback.running) {
+    playback.elapsed = Math.min(playback.duration, playback.elapsed + (now - lastTick) / 1000);
+    if (playback.elapsed >= playback.duration) {
+      playback.running = false;
+      announce(state.view === 'jukebox' && state.mode === 'scan' ? 'Scan complete' : 'Preview complete');
+    }
+    updateControls();
+  }
+  lastTick = now;
+}, 100);
+
+async function json(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(url + ' returned ' + response.status);
+  return response.json();
+}
+
+function renderShowcase() {
+  byId('showcase-cards').replaceChildren(...datasets.map((data) => {
+    const item = document.createElement('li');
+    const card = document.createElement('a');
+    card.href = '#play';
+    card.style.setProperty('--card-accent', data.accent);
+    const image = document.createElement('img');
+    image.src = data.preview;
+    image.alt = '';
+    image.loading = 'lazy';
+    const name = document.createElement('strong');
+    name.textContent = data.title;
+    card.append(image, name);
+    card.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      selectDataset(data);
+    });
+    item.append(card);
+    return item;
+  }));
+}
+
+async function start() {
+  const files = await json('datasets/index.json');
+  datasets = await Promise.all(files.map(async (file) => {
+    const config = await json('datasets/' + file);
+    return { ...config, ...fixtures[config.id] };
+  }));
+  symphony.duration = Math.max(...datasets.map(({ duration }) => duration));
+  renderLibrary();
+  renderShowcase();
+  renderTiles();
+  selectDataset(datasets[0]);
+}
+
+const playNotes = document.querySelectorAll('#jukebox .details > :not(:first-child)');
+const noteObserver = new IntersectionObserver((entries) => {
+  entries.forEach(({ target, isIntersecting }) => {
+    target.classList.toggle('note-visible', isIntersecting && document.body.classList.contains('play-console'));
+  });
+}, { threshold: 0.15 });
+
+navigate();
+
+start().catch((error) => {
+  byId('datasets').textContent = 'Datasets unavailable. Serve this directory over HTTP to load the previews.';
+  console.error(error);
 });

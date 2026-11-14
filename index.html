@@ -1,97 +1,154 @@
 <!doctype html>
-<!-- Owner: Hazel · Support: Celene -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Earth Jukebox</title>
-  <meta name="description" content="Hear NASA Earth visualizations as music made from the real data in every frame.">
+  <meta name="description" content="Explore NASA Earth visualizations through sound.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&amp;display=swap">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/main.js"></script>
 </head>
-<body>
-  <a class="skip-link" href="#player">Skip to player</a>
-
-  <header class="site-header">
-    <h1>Earth Jukebox</h1>
-    <p class="tagline">Pick a NASA Earth visualization and hear the real data in every frame.</p>
-  </header>
-
-  <main class="layout">
-    <!-- Jukebox list: one button per dataset, built by js/main.js from datasets/index.json -->
-    <nav class="panel jukebox" aria-labelledby="jukebox-heading">
-      <h2 id="jukebox-heading">Jukebox</h2>
-      <ul id="dataset-list" class="dataset-list">
-        <li class="loading">Loading datasets…</li>
-      </ul>
+<body class="home-active">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="shell header">
+    <a class="brand" href="#home"><span class="brand-icon" aria-hidden="true"></span><span>EARTH<br>JUKEBOX</span></a>
+    <nav id="site-navigation" aria-label="Studio views">
+      <a href="#home" aria-current="page">Home</a>
+      <a href="#play">Play</a>
+      <a href="#scan">Scan</a>
+      <a href="#explore">Explore</a>
+      <a href="#symphony">Planet Symphony</a>
     </nav>
+    <button id="menu-toggle" aria-controls="site-navigation" aria-expanded="false" aria-label="Toggle navigation">☰</button>
+  </header>
+  <main id="main" class="shell" tabindex="-1">
+<section id="home" class="flight" aria-labelledby="hero-title">
+  <div class="landing">
+  <div class="starfield" aria-hidden="true"></div>
+  <div class="planet planet-main" aria-hidden="true"></div>
+  <div class="planet planet-left" aria-hidden="true"></div>
+  <div class="planet planet-right" aria-hidden="true"></div>
+  <div id="orbit-scene" aria-hidden="true"></div>
+  <div class="flight-light" aria-hidden="true"></div>
+  <div class="hero-copy">
+    <p class="hero-kicker">NASA EARTH OBSERVATIONS</p>
+    <div class="hero-heading">
+      <button class="orbit-arrow" id="previous-feature" aria-label="Previous feature">‹</button>
+      <h1 id="hero-title" class="hero-title">EARTH JUKEBOX</h1>
+      <button class="orbit-arrow" id="next-feature" aria-label="Next feature">›</button>
+    </div>
+    <p id="hero-subtitle">Listen to the planet</p>
+    <a id="hero-action" class="hero-action" href="#play">Open Jukebox <span aria-hidden="true">↗</span></a>
+  </div>
+  <nav class="hero-features" aria-label="Explore Earth Jukebox">
+    <a href="#play"><strong>Play</strong><span>Preview a dataset timeline</span></a>
+    <a href="#scan"><strong>Scan</strong><span>Sweep west to east</span></a>
+    <a href="#explore"><strong>Explore</strong><span>Inspect a location</span></a>
+    <a href="#symphony"><strong>Planet Symphony</strong><span>See four datasets together</span></a>
+  </nav>
+  <a class="flight-cue" href="#dataset-showcase">Explore the datasets <span aria-hidden="true">↓</span></a>
+  <div class="flight-progress" aria-hidden="true"></div>
+  </div>
+</section>
 
-    <!-- Player: muted video (no native controls) + overlay canvas + custom controls -->
-    <section id="player" class="panel player" aria-labelledby="player-heading" tabindex="-1">
-      <h2 id="player-heading">Now playing: <span id="now-playing">nothing yet</span></h2>
-
-      <div class="stage">
-        <video id="video" muted playsinline preload="metadata" aria-hidden="true"></video>
-        <canvas id="overlay" class="overlay" width="1280" height="720"
-                role="img" aria-label="Visualization. Use Explore mode to hear values by position."></canvas>
-        <p id="player-message" class="player-message" role="status" hidden></p>
-      </div>
-
-      <div class="controls" role="group" aria-label="Player controls">
-        <button id="play-btn" type="button" aria-label="Play">Play</button>
-
-        <label for="scrub" class="visually-hidden">Position</label>
-        <input id="scrub" type="range" min="0" max="100" step="0.1" value="0"
-               aria-valuetext="0:00 of 0:00">
-        <span id="time" class="time" aria-hidden="true">0:00 / 0:00</span>
-
-        <div class="modes" role="group" aria-label="Mode">
-          <button type="button" class="mode-btn" data-mode="play" aria-pressed="true">Play</button>
-          <button type="button" class="mode-btn" data-mode="scan" aria-pressed="false">Scan</button>
-          <button type="button" class="mode-btn" data-mode="explore" aria-pressed="false">Explore</button>
-        </div>
-
-        <label for="volume">Volume</label>
-        <input id="volume" type="range" min="-40" max="0" step="1" value="-8" aria-valuetext="-8 decibels">
-      </div>
+    <div id="home-details">
+    <section id="dataset-showcase" class="showcase" aria-labelledby="showcase-title">
+      <ul id="showcase-cards" class="showcase-cards" aria-label="NASA datasets"></ul>
+      <h2 id="showcase-title" tabindex="-1">Hear Earth in four ways.</h2>
+      <a class="showcase-action" href="#play">Open Jukebox <span aria-hidden="true">↗</span></a>
     </section>
 
-    <!-- Info panel: description, legend, mapping explanation, live readout -->
-    <aside class="panel info" aria-labelledby="info-heading">
-      <h2 id="info-heading">About this dataset</h2>
-      <p id="description">Choose a dataset from the jukebox.</p>
-
-      <button id="legend-btn" type="button">Play legend</button>
-      <ul id="legend" class="legend"></ul>
-
-      <h3>How we mapped it</h3>
-      <p id="mapping">—</p>
-
-      <h3>Live readout</h3>
-      <p id="readout" class="readout">—</p>
-
-      <details class="shortcuts">
-        <summary>Keyboard shortcuts</summary>
-        <dl>
-          <dt>Space</dt><dd>Play / pause</dd>
-          <dt>← / →</dt><dd>Scrub 5 seconds</dd>
-          <dt>↑ / ↓</dt><dd>Volume</dd>
-          <dt>1–4</dt><dd>Pick dataset</dd>
-          <dt>M</dt><dd>Cycle mode (Play, Scan, Explore)</dd>
-          <dt>L</dt><dd>Play legend</dd>
-          <dt>D</dt><dd>Describe current frame</dd>
-          <dt>Esc</dt><dd>Stop sound</dd>
-        </dl>
-      </details>
-    </aside>
+    <section class="shell home-process" aria-labelledby="process-title">
+      <p class="eyebrow">How it works</p>
+      <h2 id="process-title">From Earth data to sound.</h2>
+      <div class="sound-marquee" aria-hidden="true">
+        <div class="sound-track"><div class="sound-group">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14V5a2 2 0 0 1 4 0v9a4 4 0 1 1-4 0ZM12 9v8"/></svg> Ocean temperature</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h6l-1 8 9-12h-6z"/></svg> Lightning flashes</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15A8 8 0 0 1 9 4a8.5 8.5 0 1 0 11 11Z"/></svg> Night lights</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 9-5 9 5-9 5zM3 12l9 5 9-5M3 16l9 5 9-5"/></svg> Aerosol layers</span>
+        </div></div>
+        <div class="sound-track"><div class="sound-group">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17V5l9-2v12M10 17a3 2 0 1 1-6 0 3 2 0 0 1 6 0ZM19 15a3 2 0 1 1-6 0 3 2 0 0 1 6 0Z"/></svg> Pitch</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4m10-8 4 4-4 4"/></svg> Stereo position</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-4m4 8V6m4 15V3m4 15V6m4 8v-4"/></svg> Note density</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8c4-7 6 7 10 0s6 7 10 0M2 16c4-7 6 7 10 0s6 7 10 0"/></svg> Timbre</span>
+        </div></div>
+      </div>
+      <div class="home-steps">
+        <a href="#play"><strong>Play a timeline <span aria-hidden="true">↗</span></strong><p>Follow changes over time and use the sonic legend to see what each sound represents.</p></a>
+        <a href="#scan"><strong>Sweep the map <span aria-hidden="true">↗</span></strong><p>Move west to east to see how a spatial pattern becomes a sequence.</p></a>
+        <a href="#explore"><strong>Inspect a location <span aria-hidden="true">↗</span></strong><p>Choose a grid cell with your keyboard, mouse, or touch to read its preview value.</p></a>
+      </div>
+    </section>
+    <section class="home-symphony" aria-labelledby="home-symphony-title">
+      <div class="shell">
+        <h2 id="home-symphony-title">Planet Symphony</h2>
+        <p>See ocean currents, lightning, city lights, and airborne particles side by side.</p>
+        <a class="showcase-action" href="#symphony">Open Planet Symphony <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+    </div>
+    <section class="intro" hidden aria-labelledby="intro-heading">
+      <p class="eyebrow">EARTH OBSERVATION STUDIO</p>
+      <h2 id="intro-heading">Listen to the planet.</h2>
+      <p>Explore NASA Earth visualizations through sound.</p>
+    </section>
+    <div id="jukebox" class="layout" hidden>
+      <section class="play-summary" aria-labelledby="play-summary-title" hidden>
+        <p class="eyebrow">Earth observation · Play</p>
+        <h2 id="play-summary-title">Earth visualization</h2>
+        <p id="play-summary-dates" class="eyebrow"></p>
+        <p id="play-summary-description"></p>
+        <button id="dataset-notes" aria-haspopup="dialog" disabled>Dataset details ↗</button>
+      </section>
+      <nav class="panel library" aria-labelledby="library-heading">
+        <h3 id="library-heading">Dataset library</h3>
+        <ul id="datasets" class="datasets"><li>Loading datasets…</li></ul>
+      </nav>
+      <section class="panel player" aria-labelledby="dataset-title">
+        <div class="player-heading">
+          <p id="dataset-dates" class="eyebrow"></p>
+          <h3 id="dataset-title">Earth visualization</h3>
+        </div>
+        <div id="stage" class="stage">
+          <div id="media" class="media"></div>
+          <div id="scan-line" class="scan-line" hidden></div>
+          <div id="cursor" class="cursor" hidden></div>
+        </div>
+        <p id="instruction" class="instruction"></p>
+        <div id="player-controls" class="controls"></div>
+        <div class="modes" role="group" aria-label="Exploration mode">
+          <button data-mode="play" aria-pressed="true">Play</button>
+          <button data-mode="scan" aria-pressed="false">Scan</button>
+          <button data-mode="explore" aria-pressed="false">Explore</button>
+        </div>
+      </section>
+      <aside class="details" aria-label="Dataset information">
+        <section class="panel info"><h3>About this dataset</h3><p id="description"></p></section>
+        <section id="readout" class="panel info readout" aria-label="Dataset readout"></section>
+        <section class="panel info">
+          <h3>Sonic legend</h3><ul id="legend"></ul>
+          <button id="legend-button">▷ Play legend</button>
+          <p id="legend-preview" hidden></p>
+        </section>
+        <section class="panel info">
+          <h3>How we mapped it</h3><p id="mapping"></p>
+          <a id="source">NASA visualization ↗</a>
+        </section>
+      </aside>
+    </div>
+    <section id="symphony" hidden aria-labelledby="symphony-title">
+      <div class="symphony-heading"><h3 id="symphony-title">Planet Symphony</h3><a href="#play">← Back to Jukebox</a></div>
+      <div id="tiles" class="tiles"></div>
+      <div id="symphony-controls" class="panel controls"></div>
+    </section>
   </main>
-
-  <footer class="site-footer">
-    <p>Visualizations: <a href="https://svs.gsfc.nasa.gov/">NASA Scientific Visualization Studio</a>.
-       Built for the NASA Space Apps Challenge 2026.</p>
-  </footer>
-
-  <!-- Screen-reader announcements (written by js/a11y.js) -->
-  <div id="live" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+  <footer class="shell footer"><span>NASA Space Apps Challenge 2026</span><a href="https://svs.gsfc.nasa.gov/">NASA Scientific Visualization Studio ↗</a></footer>
+  <dialog id="play-dialog" aria-labelledby="play-dialog-title">
+    <div class="dialog-heading">
+      <h2 id="play-dialog-title"></h2>
+      <form method="dialog"><button autofocus aria-label="Close dialog">×</button></form>
+    </div>
+    <div id="play-dialog-content"></div>
+  </dialog>
+  <div id="status" role="status" class="sr-only"></div>
 </body>
 </html>
