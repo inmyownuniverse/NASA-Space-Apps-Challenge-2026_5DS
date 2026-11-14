@@ -138,6 +138,8 @@ button[aria-pressed="true"], button[aria-current="true"] {
 
 /* Info panel */
 .legend { padding-left: 1.2rem; }
+.legend li.speaking { color: var(--accent, #ffd23f); font-weight: 600; }
+.legend-first { display: block; margin: 0.5rem 0; }
 .readout { font-variant-numeric: tabular-nums; color: var(--muted); }
 .shortcuts { margin-top: 1rem; }
 .shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; }

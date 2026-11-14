@@ -1,9 +1,9 @@
 // Owner: Hazel · Support: Celene
 // App entry: loads dataset configs, builds the jukebox list, wires controls and shortcuts.
 
-import { initAudio, loadDataset, releaseAll, setVolume } from './sound/engine.js';
+import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample } from './sound/engine.js';
 import * as player from './player.js';
-import { announce, speak, formatTime } from './a11y.js';
+import { announce, speak, speakAndWait, formatTime } from './a11y.js';
 
 const MODES = ['play', 'scan', 'explore'];
 const SCRUB_STEP = 5;   // seconds for ←/→
@@ -12,6 +12,8 @@ const VOLUME_STEP = 2;  // dB for ↑/↓
 let datasets = [];
 let current = null;
 let mode = 'play';
+let legendRun = 0;             // bumped to cancel a legend that is playing
+const legendHeard = new Set(); // dataset ids whose legend was heard (for "legend first")
 
 const $ = (id) => document.getElementById(id);
 
@@ -65,7 +67,7 @@ function selectDataset(i) {
   loadDataset(cfg); // before player.load, so Scan mode can start on the new dataset
   player.load(cfg);
   updatePlayButton();
-  announce(`${cfg.title} selected. Press Space to play.`);
+  announce(`${cfg.title} selected. Press Space to play, or L to hear the legend.`);
 }
 
 function mappingText(cfg) {
@@ -85,6 +87,11 @@ async function togglePlay() {
     announce('Paused');
   } else {
     if (mode === 'scan') await setMode('play'); // Play leaves Scan mode and plays the video again
+    if ($('legend-first').checked && !legendHeard.has(current.id)) {
+      const cfg = current;
+      const finished = await playLegend();
+      if (!finished || cfg !== current) { updatePlayButton(); return; }
+    }
     await player.play();
   }
   updatePlayButton();
@@ -123,12 +130,35 @@ function onVolume() {
   setVolume(Number(v.value));
 }
 
-function playLegend() {
-  if (!current) { announce('Choose a dataset first.'); return; }
-  const text = current.legend.map((l) => `${l.sound} means ${l.means}`).join('. ');
-  speak(text);
-  announce(text);
-  // TODO(Freia): play an example of each sound while its line is spoken.
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sonic legend: speak each legend line, then play its example sound.
+ * @returns {Promise<boolean>} true if it played to the end, false if it was stopped
+ */
+async function playLegend() {
+  if (!current) { announce('Choose a dataset first.'); return false; }
+  await ensureAudio();
+  if (player.isPlaying()) { player.pause(); updatePlayButton(); }
+  const run = ++legendRun;
+  const cfg = current;
+  const items = [...document.querySelectorAll('#legend li')];
+  const stopped = () => run !== legendRun || cfg !== current;
+
+  legendHeard.add(cfg.id); // heard or skipped: either way, don't force it again
+  await speakAndWait(`Legend for ${cfg.title}. Press Escape to skip.`);
+  for (let i = 0; i < cfg.legend.length; i++) {
+    if (stopped()) break;
+    items.forEach((li, k) => li.classList.toggle('speaking', k === i));
+    await speakAndWait(`${cfg.legend[i].sound} means ${cfg.legend[i].means}.`);
+    if (stopped()) break;
+    playLegendSample(cfg, i);
+    await wait(2200);
+  }
+  items.forEach((li) => li.classList.remove('speaking'));
+  if (stopped()) return false;
+  releaseAll();
+  return true;
 }
 
 function describeNow() {
@@ -136,6 +166,7 @@ function describeNow() {
 }
 
 function stopAll() {
+  legendRun++; // cancels a legend that is playing
   player.pause();
   releaseAll();
   if ('speechSynthesis' in window) speechSynthesis.cancel();

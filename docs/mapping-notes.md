@@ -153,3 +153,7 @@ Short plain notes on what each feature does and why it matters. One line per fea
 - **Scan mode.** Press Scan and the video pauses. A bar sweeps the frozen map from west to east, and
   each column plays as a short chord: low notes for the south, high notes for the north. It turns one
   moment of the map into a little melody you can follow with your ears.
+- **Sonic legend.** Before the data starts, each legend line is read out and its example sound
+  plays, for example "high notes means warm water" followed by those high notes. Listeners learn the
+  sound language first, so the music makes sense from the first second. Press L to hear it again,
+  or Escape to skip. It can be turned off with the "Hear the legend before the data starts" box.

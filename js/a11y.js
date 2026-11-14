@@ -33,6 +33,24 @@ export function speak(text) {
   speechSynthesis.speak(u);
 }
 
+/**
+ * Speak text and wait until it has been said (or maxMs passed, or speech isn't available).
+ * @returns {Promise<void>}
+ */
+export function speakAndWait(text, maxMs = 6000) {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(done, 'speechSynthesis' in window ? maxMs : 1200);
+    if (!('speechSynthesis' in window) || !text) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05;
+    u.onend = done;
+    u.onerror = done;
+    speechSynthesis.speak(u);
+  });
+}
+
 /** Short vibration on phones that support it (no-op elsewhere). */
 export function buzz(ms) {
   navigator.vibrate?.(ms);
