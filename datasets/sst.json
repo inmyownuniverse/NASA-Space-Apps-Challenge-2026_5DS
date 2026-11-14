@@ -32,17 +32,20 @@
   "sound": {
     "mapper": "continuousField",
     "scale": "C major pentatonic",
-    "octaves": [3, 5],
     "instrument": "warmPad",
     "valueTo": "pitch",
     "changeTo": "filter",
-    "maxVoices": 6,
-    "smoothFrames": 3,
-    "tensionAbove": 28
+    "legendExamples": [
+      { "values": [24, 27, 30] },
+      { "values": [6, 3, 0] },
+      { "values": [15], "sweep": true }
+    ]
   },
   "legend": [
     { "sound": "high notes", "means": "warm water" },
-    { "sound": "low notes", "means": "cold water" }
+    { "sound": "low notes", "means": "cold water" },
+    { "sound": "brighter, sweeping tone", "means": "fast-moving currents" }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Freia: tune sound block."
 }
