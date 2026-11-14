@@ -26,6 +26,15 @@ function direction(col, row, gw, gh) {
   return [ns, ew].filter(Boolean).join(' ') || 'centre';
 }
 
+/**
+ * Where the video sits on the overlay canvas. The video keeps its shape inside the 16:9 stage,
+ * so a 2:1 video has black bars above and below: scale s and offsets ox, oy (canvas pixels).
+ */
+function fit(canvas, vw, vh) {
+  const s = Math.min(canvas.width / vw, canvas.height / vh);
+  return { s, ox: (canvas.width - vw * s) / 2, oy: (canvas.height - vh * s) / 2 };
+}
+
 /** Cell rectangle in video pixels. */
 function cellRect(cfg, col, row, vw, vh) {
   const crop = cfg.crop ?? { x: 0, y: 0, w: vw, h: vh };
@@ -163,13 +172,14 @@ export function enableExplore(canvas, cfg) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const vw = video.videoWidth || canvas.width, vh = video.videoHeight || canvas.height;
     const r = cellRect(cfg, col, row, vw, vh);
-    const sx = canvas.width / vw, sy = canvas.height / vh;
+    const { s, ox, oy } = fit(canvas, vw, vh);
+    const x = ox + r.x * s, y = oy + r.y * s, w = r.w * s, h = r.h * s;
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#ffd23f';
-    ctx.strokeRect(r.x * sx, r.y * sy, r.w * sx, r.h * sy);
+    ctx.strokeRect(x, y, w, h);
     ctx.lineWidth = 1;
     ctx.strokeStyle = '#000';
-    ctx.strokeRect(r.x * sx - 2, r.y * sy - 2, r.w * sx + 4, r.h * sy + 4);
+    ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
   }
 
   function probe(forceAnnounce) {
@@ -194,8 +204,9 @@ export function enableExplore(canvas, cfg) {
   function cellFromPointer(e) {
     const rect = canvas.getBoundingClientRect();
     const vw = video.videoWidth || canvas.width, vh = video.videoHeight || canvas.height;
-    const x = ((e.clientX - rect.left) / rect.width) * vw;
-    const y = ((e.clientY - rect.top) / rect.height) * vh;
+    const { s, ox, oy } = fit(canvas, vw, vh);
+    const x = (((e.clientX - rect.left) / rect.width) * canvas.width - ox) / s;
+    const y = (((e.clientY - rect.top) / rect.height) * canvas.height - oy) / s;
     const crop = cfg.crop ?? { x: 0, y: 0, w: vw, h: vh };
     const c = Math.floor(((x - crop.x) / crop.w) * gw);
     const r = Math.floor(((y - crop.y) / crop.h) * gh);

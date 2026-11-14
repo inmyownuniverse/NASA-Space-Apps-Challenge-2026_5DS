@@ -172,13 +172,16 @@ function drawScanColumn(col) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (reducedMotion.matches) return;
   const crop = cfg.crop ?? { x: 0, y: 0, w: canvas.width, h: canvas.height };
-  const sx = canvas.width / (video.videoWidth || canvas.width);
-  const sy = canvas.height / (video.videoHeight || canvas.height);
-  const w = (crop.w / cfg.grid.w) * sx;
+  const vw = video.videoWidth || canvas.width, vh = video.videoHeight || canvas.height;
+  // The video keeps its shape inside the 16:9 stage (black bars for other shapes).
+  const s = Math.min(canvas.width / vw, canvas.height / vh);
+  const ox = (canvas.width - vw * s) / 2, oy = (canvas.height - vh * s) / 2;
+  const w = (crop.w / cfg.grid.w) * s;
+  const x = ox + crop.x * s + col * w, y = oy + crop.y * s, h = crop.h * s;
   ctx.fillStyle = 'rgba(255, 210, 63, 0.35)';
-  ctx.fillRect(crop.x * sx + col * w, crop.y * sy, w, crop.h * sy);
+  ctx.fillRect(x, y, w, h);
   ctx.fillStyle = 'rgba(255, 210, 63, 0.9)';
-  ctx.fillRect(crop.x * sx + col * w + w / 2 - 1.5, crop.y * sy, 3, crop.h * sy);
+  ctx.fillRect(x + w / 2 - 1.5, y, 3, h);
 }
 
 function loop() {
