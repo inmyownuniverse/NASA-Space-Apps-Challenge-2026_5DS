@@ -170,3 +170,9 @@ Short plain notes on what each feature does and why it matters. One line per fea
   8 seconds a voice gives a one-sentence summary, such as "Visible currents average 21 degrees,
   rising". It shows that the whole story can be followed by ear alone, which is exactly how a blind
   listener uses it. Everything still works from the keyboard.
+- **Add your own visualization (add.html).** Load any video or image, drag a box over the map, click
+  the two ends of the colour bar and type the values at each end. The page reads the colour bar,
+  says how many map cells match it, plays the result straight away with the same sound engine, and
+  downloads the config file. Drop that file in `datasets/` and the new visualization is in the
+  jukebox, with no code changes. This is the live proof that Earth Jukebox works for any EIC
+  visualization, not just our four.
