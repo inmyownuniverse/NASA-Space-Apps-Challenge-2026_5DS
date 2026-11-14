@@ -157,3 +157,8 @@ Short plain notes on what each feature does and why it matters. One line per fea
   plays, for example "high notes means warm water" followed by those high notes. Listeners learn the
   sound language first, so the music makes sense from the first second. Press L to hear it again,
   or Escape to skip. It can be turned off with the "Hear the legend before the data starts" box.
+- **Explore mode and the proof panel.** Press Explore, then move a finger or the mouse over the map,
+  or use the arrow keys. You hear the note for that one spot, and phones buzz on hotspots. The proof
+  panel shows the exact pixel colour, where it sits on the colour bar, the real value it stands for
+  (for example 28.9 °C) and the note it became. It is the one-glance proof that the music comes from
+  the data, not from how pretty the colours are. Screen readers hear the same thing as a short sentence.

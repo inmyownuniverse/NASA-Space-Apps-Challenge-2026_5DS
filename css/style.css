@@ -141,6 +141,19 @@ button[aria-pressed="true"], button[aria-current="true"] {
 .legend li.speaking { color: var(--accent, #ffd23f); font-weight: 600; }
 .legend-first { display: block; margin: 0.5rem 0; }
 .readout { font-variant-numeric: tabular-nums; color: var(--muted); }
+.player-message { pointer-events: none; } /* Explore mode can still be used over the message */
+.overlay:focus-visible { outline: 3px solid #ffd23f; outline-offset: -3px; }
+
+/* Explore mode proof panel (built by js/explore.js) */
+.probe { margin-top: 1rem; padding: 0.75rem; border: 1px solid var(--accent); border-radius: 6px; }
+.probe h3 { margin-top: 0; }
+.probe p { margin: 0.35rem 0; }
+.probe-row { display: flex; gap: 0.6rem; align-items: center; }
+.probe-swatch { width: 2rem; height: 2rem; border: 2px solid #fff; border-radius: 4px; flex: none; }
+.probe-bar { position: relative; height: 0.9rem; border-radius: 3px; margin-top: 0.6rem; }
+.probe-marker { position: absolute; top: -0.35rem; width: 4px; height: 1.6rem; margin-left: -2px; background: #fff; border: 1px solid #000; }
+.probe-bar-ends { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); }
+.probe-value, .probe-note { font-variant-numeric: tabular-nums; }
 .shortcuts { margin-top: 1rem; }
 .shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; }
 .shortcuts dt { font-weight: 600; }

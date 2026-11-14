@@ -274,6 +274,53 @@ export function playLegendSample(cfg, i) {
   }
 }
 
+// ---------- Explore mode ----------
+
+/** Note name a data value maps to for this dataset (same scale and octaves as playback). */
+export function noteForValue(cfg, value) {
+  const c = tuned(cfg);
+  const [min, max] = valueRange(c);
+  const [lo, hi] = c.sound.octaves ?? [3, 5];
+  const midi = valueToMidi(value, min, max, lo, hi, c.sound.scale);
+  return midi === null ? null : midiToNote(midi);
+}
+
+/**
+ * Play one short note for a single explored spot.
+ * @param {object} cfg dataset config
+ * @param {number} value data value at that spot
+ * @param {number} [col] grid column, for left/right position (0 = west edge)
+ * @returns {string|null} the note played, e.g. "E5"
+ */
+export function playProbe(cfg, value, col) {
+  if (!started || !voice) return null;
+  const note = noteForValue(cfg, value);
+  if (!note) return null;
+  const X = TUNING.explore;
+  const t = Tone.now() + lookAhead();
+  const gw = cfg.grid?.w ?? 32;
+  if (col !== undefined && gw > 1) voice.panner.pan.setValueAtTime(-1 + (2 * col) / (gw - 1), t);
+
+  let inst = voice.inst;
+  if (!inst) {
+    // Aerosols: play through the first held (non-bell) layer and make it audible for a moment.
+    const names = Object.keys(voice.layers);
+    const name = names.find((n) => !voice.layers[n].percussive) ?? names[0];
+    if (!name) return null;
+    inst = voice.layers[name];
+    const gain = voice.layerGains[name];
+    if (gain.volume.value < X.layerLevel) {
+      gain.volume.setValueAtTime(X.layerLevel, t);
+      gain.volume.setValueAtTime(SILENT_DB, t + X.noteLength + 1.5);
+    }
+  }
+  const st = voice.state;
+  const at = inst.percussive ? Math.max(t, (st.lastHit ?? 0) + 0.03) : t; // drums: start times must increase
+  if (inst.percussive) st.lastHit = at;
+  inst.triggerAttackRelease(note, X.noteLength, at, X.velocity);
+  return note;
+}
+
 // ---------- shared ----------
 
 /** Stop all sounding notes (pause, seek, dataset switch, Esc). */

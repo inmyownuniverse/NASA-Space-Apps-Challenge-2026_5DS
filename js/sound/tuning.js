@@ -44,6 +44,12 @@ export const TUNING = {
     layerVelocity: 0.6,    // how hard a solo aerosol layer is played
   },
 
+  explore: {
+    noteLength: 0.35,  // how long the note for one explored spot rings, s
+    velocity: 0.5,     // how hard that note is played
+    layerLevel: -6,    // aerosol layer volume used for explored notes, dB
+  },
+
   // Fallback for datasets that are not listed under "datasets" below.
   defaults: {
     octaves: [3, 5],        // lowest and highest octave notes can use
