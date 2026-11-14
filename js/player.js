@@ -3,6 +3,7 @@
 
 import { analyze, resetAnalyzer } from './analyzer.js';
 import { playFrame, releaseAll } from './sound/engine.js';
+import { demoFeatures } from './sound/demo.js';
 import { describe, announce } from './a11y.js';
 import { enableExplore } from './explore.js';
 
@@ -135,8 +136,8 @@ function tick(t) {
   if (t - lastT < STEP && t >= lastT) return;
   lastT = t;
 
-  // No video file yet: ask the analyser for sample data explicitly so the dataset still sounds.
-  const features = analyze(video, cfg, { fake: missing });
+  // No video file yet: use sample data shaped for this dataset, so it can still be heard.
+  const features = missing ? demoFeatures(cfg, t) : analyze(video, cfg);
   playFrame(features, cfg, t);
   describe(features, cfg, t);
   // TODO(Freia): in Scan mode, play features.columns[scanColumn] as a chord instead.
