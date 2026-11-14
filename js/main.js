@@ -4,6 +4,7 @@
 import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample } from './sound/engine.js';
 import * as player from './player.js';
 import { announce, speak, speakAndWait, formatTime } from './a11y.js';
+import { setEyesClosed } from './eyes.js';
 
 const MODES = ['play', 'scan', 'explore'];
 const SCRUB_STEP = 5;   // seconds for ←/→
@@ -178,6 +179,22 @@ function applyUrl() {
   }
 }
 
+let eyesClosed = false;
+function toggleEyes() {
+  eyesClosed = !eyesClosed;
+  $('eyes-btn').setAttribute('aria-pressed', String(eyesClosed));
+  setEyesClosed(eyesClosed, {
+    getFeatures: player.latestFeatures,
+    getCfg: () => current,
+    isPlaying: player.isPlaying,
+  });
+  const text = eyesClosed
+    ? 'Eyes-closed mode on. The picture is hidden and a short summary is spoken every 8 seconds. Press E to turn it off.'
+    : 'Eyes-closed mode off.';
+  speak(text);
+  announce(text);
+}
+
 function scrubBy(dt) {
   player.seek(player.currentTime() + dt);
   updateTime();
@@ -259,6 +276,7 @@ function wireControls() {
   $('volume').addEventListener('input', onVolume);
   $('legend-btn').addEventListener('click', playLegend);
   $('share-btn').addEventListener('click', copyLink);
+  $('eyes-btn').addEventListener('click', toggleEyes);
   $('video').addEventListener('timeupdate', updateTime);
   $('video').addEventListener('loadedmetadata', updateTime);
   setInterval(() => { if (player.isPlaying()) updateTime(); }, 500); // also covers the no-video clock
@@ -284,6 +302,7 @@ function onKey(e) {
     case 'm': case 'M': setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]); break;
     case 'l': case 'L': playLegend(); break;
     case 'd': case 'D': describeNow(); break;
+    case 'e': case 'E': toggleEyes(); break;
     case 'Escape': stopAll(); break;
     default: return;
   }

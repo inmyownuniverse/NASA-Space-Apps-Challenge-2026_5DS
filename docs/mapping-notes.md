@@ -166,3 +166,7 @@ Short plain notes on what each feature does and why it matters. One line per fea
   `index.html?dataset=sst&t=30&mode=scan`. The "Copy link" button copies a link to this exact moment,
   so anyone (a judge, a teacher, another website) opens the same dataset, time and mode. Browsers only
   allow sound after a click, so the link waits for one click or key press before it starts.
+- **Eyes-closed mode.** Press E (or the "Eyes closed" button). The picture disappears and every
+  8 seconds a voice gives a one-sentence summary, such as "Visible currents average 21 degrees,
+  rising". It shows that the whole story can be followed by ear alone, which is exactly how a blind
+  listener uses it. Everything still works from the keyboard.

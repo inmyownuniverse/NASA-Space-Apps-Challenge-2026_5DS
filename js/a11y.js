@@ -3,6 +3,10 @@
 
 const DATA_THROTTLE_MS = 5000; // at most one data line per 5 s so screen readers aren't flooded
 let lastDataAnnounce = 0;
+let dataAnnouncements = true; // off in eyes-closed mode, which speaks its own summaries
+
+/** Turn the throttled data lines in the live region on or off. */
+export function setDataAnnouncements(on) { dataAnnouncements = on; }
 
 /**
  * Write text into the aria-live="polite" region (#live).
@@ -14,6 +18,7 @@ export function announce(text, { data = false } = {}) {
   if (!live || !text) return;
 
   if (data) {
+    if (!dataAnnouncements) return;
     const now = performance.now();
     if (now - lastDataAnnounce < DATA_THROTTLE_MS) return;
     lastDataAnnounce = now;

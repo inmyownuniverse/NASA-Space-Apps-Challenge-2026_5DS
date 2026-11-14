@@ -144,6 +144,15 @@ button[aria-pressed="true"], button[aria-current="true"] {
 .player-message { pointer-events: none; } /* Explore mode can still be used over the message */
 .overlay:focus-visible { outline: 3px solid #ffd23f; outline-offset: -3px; }
 
+/* Eyes-closed mode: hide the picture, keep everything else */
+.eyes-message { display: none; }
+.eyes-closed .stage video, .eyes-closed .stage canvas, .eyes-closed .player-message { visibility: hidden; }
+.eyes-closed .eyes-message {
+  display: flex; position: absolute; inset: 0; margin: 0; padding: 1.5rem;
+  align-items: center; justify-content: center; text-align: center; font-size: 1.4rem;
+}
+#eyes-btn[aria-pressed="true"] { outline: 2px solid var(--accent); }
+
 /* Explore mode proof panel (built by js/explore.js) */
 .probe { margin-top: 1rem; padding: 0.75rem; border: 1px solid var(--accent); border-radius: 6px; }
 .probe h3 { margin-top: 0; }
