@@ -18,15 +18,9 @@
   "sound": {
     "mapper": "continuousField",
     "scale": "C major pentatonic",
-    "octaves": [3, 5],
     "instrument": "warmPad",
     "valueTo": "pitch",
     "changeTo": "filter",
-    "filter": [600, 4500],
-    "maxVoices": 5,
-    "smoothFrames": 4,
-    "tensionAbove": 28,
-    "symphonyLevel": -4,
     "legendExamples": [
       { "values": [24, 27, 30] },
       { "values": [6, 3, 0] },
@@ -38,5 +32,6 @@
     { "sound": "low notes", "means": "cold water" },
     { "sound": "brighter, sweeping tone", "means": "fast-moving currents" }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Aahana: measure crop box and sample real colorbar stops. Freia: tune sound block."
 }

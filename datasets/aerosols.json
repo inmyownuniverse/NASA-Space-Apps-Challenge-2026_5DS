@@ -24,15 +24,9 @@
   "sound": {
     "mapper": "layers",
     "scale": "C major pentatonic",
-    "octaves": [2, 5],
     "instruments": ["dust", "smoke", "salt", "sulfate"],
     "valueTo": "layer volume",
     "changeTo": "filter",
-    "filter": [800, 6000],
-    "maxVoices": 4,
-    "smoothFrames": 4,
-    "tensionAbove": 0.8,
-    "symphonyLevel": -10,
     "legendExamples": [
       { "layer": "dust" },
       { "layer": "smoke" },
@@ -46,5 +40,6 @@
     { "sound": "an airy shimmer", "means": "sea salt" },
     { "sound": "soft bells", "means": "sulfate" }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Aahana: measure crop box and sample the real colour of each aerosol layer (the layer rgb values are guesses). Freia: tune sound block and one instrument per layer."
 }

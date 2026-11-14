@@ -2,7 +2,8 @@
 // Mapping rules: turn features into notes. One mapper per kind of visualization.
 // Every mapper has the same signature: (features, cfg, inst, time)
 //   features — from analyzer.analyze (see js/analyzer.js)
-//   cfg      — dataset config; the mapper is chosen by cfg.sound.mapper
+//   cfg      — dataset config after tuning.js is applied (engine.js does this), so
+//              cfg.sound holds every setting; the mapper is chosen by cfg.sound.mapper
 //   inst     — the voice bundle built by engine.js:
 //              { inst, layers: { name: instrument }, layerGains: { name: Tone.Volume },
 //                filter: Tone.Filter, panner: Tone.Panner, state: {} }
@@ -10,21 +11,17 @@
 //
 // Rules shared by every dataset:
 //   - all notes snap to the dataset's scale (cfg.sound.scale, default C major pentatonic)
-//   - at most cfg.sound.maxVoices notes at once (hard cap 8)
+//   - at most cfg.sound.maxVoices notes at once (never more than TUNING.master.voiceCap)
 //   - values smoothed over cfg.sound.smoothFrames frames (running average)
 //   - stereo pan follows longitude (column): −1 west … +1 east
 //   - extreme values (above cfg.sound.tensionAbove) add a voice one semitone up
 //
-// Optional cfg.sound settings: filter [minHz, maxHz], litAbove (night-light threshold).
+// Every number used here (timings, velocities, levels) is a setting in tuning.js.
 
 import { valueToMidi, midiToNote, valueRange, norm, scaleNotes } from './scales.js';
+import { TUNING } from './tuning.js';
 
-const VOICE_CAP = 8;
-const MIN_CHANGE_GAP = 0.5;    // s between pad chord changes, so notes don't flicker
-const DENSITY_GAP = 0.5;       // s between night-light sparkle bursts
-const RESTRIKE_GAP = 1.2;      // s between strikes of percussive layers (sulfate bells)
-const LAYER_SILENT_DB = -60;   // layer volume when an aerosol type is absent
-const LAYER_PLACEHOLDER = 0.3; // layer strength used until the analyzer reports real layers
+export const SILENT_DB = -60; // volume used for "off" (a layer that is absent)
 
 // ---------- helpers ----------
 
@@ -63,7 +60,7 @@ function soundOpts(cfg) {
   return {
     lo, hi,
     scale: s.scale ?? 'C major pentatonic',
-    maxVoices: Math.min(VOICE_CAP, s.maxVoices ?? 6),
+    maxVoices: Math.min(TUNING.master.voiceCap, s.maxVoices ?? 6),
     smoothFrames: s.smoothFrames ?? 3,
   };
 }
@@ -76,13 +73,13 @@ function colToPan(col, gw) {
 /** features.change (0..1) → filter cutoff, exponential between cfg.sound.filter [min, max]. */
 function changeToCutoff(change, cfg) {
   const [fMin, fMax] = cfg.sound.filter ?? [500, 5000];
-  const c = Math.min(1, Math.max(0, (change ?? 0) * 4)); // typical change is small; scale it up
+  const c = Math.min(1, Math.max(0, (change ?? 0) * (cfg.sound.changeBoost ?? 4))); // change is usually small
   return fMin * Math.pow(fMax / fMin, c);
 }
 
 function applyChange(features, cfg, voice) {
   if (cfg.sound.changeTo === 'filter' && voice.filter) {
-    voice.filter.frequency.rampTo(changeToCutoff(features.change, cfg), 0.3);
+    voice.filter.frequency.rampTo(changeToCutoff(features.change, cfg), cfg.sound.filterGlide ?? 0.3);
   }
 }
 
@@ -114,7 +111,7 @@ function holdNotes(inst, state, notes, time) {
  *  - extra voices from the coldest, warmest and middle parts of the grid
  *  - features.change → filter sweep (faster-moving currents = brighter tone)
  *  - max above tensionAbove → a quiet voice one semitone above the root
- * Notes are held and only change when the chord changes (at most every 0.5 s).
+ * Notes are held and only change when the chord changes (at most every chordChangeGap s).
  */
 export function continuousField(features, cfg, inst, time) {
   const voice = inst;
@@ -127,7 +124,7 @@ export function continuousField(features, cfg, inst, time) {
 
   const avg = smooth(st, 'mean', features.mean, smoothFrames);
   if (avg === null) return;
-  if (st.lastChange !== undefined && time - st.lastChange < MIN_CHANGE_GAP) return;
+  if (st.lastChange !== undefined && time - st.lastChange < (s.chordChangeGap ?? 0.5)) return;
 
   // Skip tension on sample data: its max is a fixed placeholder, not a measurement.
   const tense = !features.fake && s.tensionAbove !== undefined &&
@@ -135,14 +132,14 @@ export function continuousField(features, cfg, inst, time) {
   const budget = tense ? maxVoices - 1 : maxVoices;
 
   const root = valueToMidi(avg, min, max, lo, hi, scale);
-  const notes = new Map([[root, 0.35]]);
+  const notes = new Map([[root, s.rootVelocity ?? 0.35]]);
   const vals = validValues(features.grid);
   for (const p of [0.1, 0.9, 0.5, 0.25, 0.75, 0.0, 1.0]) {
     if (notes.size >= budget || !vals.length) break;
     const midi = valueToMidi(percentile(vals, p), min, max, lo, hi, scale);
-    if (!notes.has(midi)) notes.set(midi, 0.2);
+    if (!notes.has(midi)) notes.set(midi, s.extraVelocity ?? 0.2);
   }
-  if (tense) notes.set(root + 1, 0.12);
+  if (tense) notes.set(root + 1, s.tensionVelocity ?? 0.12);
 
   const key = [...notes.keys()].sort((a, b) => a - b).join(',');
   if (key === st.lastKey) return;
@@ -159,6 +156,7 @@ export function continuousField(features, cfg, inst, time) {
  */
 export function events(features, cfg, inst, time) {
   const voice = inst;
+  const s = cfg.sound;
   const flashes = features.flashes ?? [];
   if (!flashes.length) return;
 
@@ -174,10 +172,11 @@ export function events(features, cfg, inst, time) {
   for (const f of hits) {
     voice.panner?.pan.setValueAtTime(colToPan(f.x, gw), t);
     const midi = valueToMidi(gh - 1 - f.y, 0, gh - 1, lo, hi, scale);
-    const vel = 0.3 + 0.7 * norm(f.value ?? max, min, max);
-    voice.inst.triggerAttackRelease(midiToNote(midi), '16n', t, vel);
+    const soft = s.softestHit ?? 0.3;
+    const vel = soft + (1 - soft) * norm(f.value ?? max, min, max);
+    voice.inst.triggerAttackRelease(midiToNote(midi), s.hitLength ?? '16n', t, vel);
     st.lastHit = t;
-    t += 0.06;
+    t += s.hitSpacing ?? 0.06;
   }
 }
 
@@ -192,19 +191,20 @@ export function density(features, cfg, inst, time) {
   const voice = inst;
   const s = cfg.sound;
   const st = voice.state;
-  if (st.lastBurst !== undefined && time - st.lastBurst < DENSITY_GAP) return;
+  const gap = s.burstGap ?? 0.5;
+  if (st.lastBurst !== undefined && time - st.lastBurst < gap) return;
 
   const [min, max] = valueRange(cfg);
   const { lo, hi, scale, maxVoices } = soundOpts(cfg);
   const play = (value, t, vel) => {
     const midi = valueToMidi(value, min, max, lo, hi, scale);
-    if (midi !== null) voice.inst.triggerAttackRelease(midiToNote(midi), '8n', t, vel);
+    if (midi !== null) voice.inst.triggerAttackRelease(midiToNote(midi), s.noteLength ?? '8n', t, vel);
   };
 
   const vals = validValues(features.grid);
   if (!vals.length) {
     if (features.mean === null || features.mean === undefined) return;
-    play(features.mean, time, 0.3);
+    play(features.mean, time, s.softestNote ?? 0.15);
     st.lastBurst = time;
     return;
   }
@@ -217,13 +217,14 @@ export function density(features, cfg, inst, time) {
   st.lastBurst = time;
   if (!lit.length) return;
 
-  const n = Math.max(1, Math.min(maxVoices, Math.round(frac * maxVoices * 2)));
-  const spacing = (DENSITY_GAP * 0.9) / n;
+  const n = Math.max(1, Math.min(maxVoices, Math.round(frac * maxVoices * (s.notesPerLitShare ?? 2))));
+  const spacing = (gap * 0.9) / n;
+  const soft = s.softestNote ?? 0.15, loud = s.loudestNote ?? 0.6;
   for (let i = 0; i < n; i++) {
     const v = lit[Math.round((n === 1 ? 1 : i / (n - 1)) * (lit.length - 1))];
-    play(v, time + i * spacing, 0.15 + 0.45 * norm(v, min, max));
+    play(v, time + i * spacing, soft + (loud - soft) * norm(v, min, max));
   }
-  if (growth > 0.01) play(max, time + DENSITY_GAP * 0.5, 0.25);
+  if (growth > (s.sparkleGrowth ?? 0.01)) play(max, time + gap * 0.5, s.sparkleVelocity ?? 0.25);
 }
 
 /**
@@ -231,7 +232,7 @@ export function density(features, cfg, inst, time) {
  *  - layer i plays chord tone i (dust lowest … sulfate highest), so the layers blend
  *  - the whole chord shifts up slightly with the overall mean value
  *  - features.layers[name] (0..1) → that layer's volume (absent → silent)
- *  - sustaining layers hold their note; percussive layers (bells) are re-struck every 1.2 s
+ *  - sustaining layers hold their note; percussive layers (bells) are re-struck every bellGap s
  *  - the densest layer above tensionAbove adds a semitone-up voice on that layer
  */
 export function layers(features, cfg, inst, time) {
@@ -247,7 +248,9 @@ export function layers(features, cfg, inst, time) {
   applyChange(features, cfg, voice);
 
   const avg = smooth(st, 'mean', features.mean, smoothFrames);
-  const shift = avg === null ? 0 : Math.round(norm(avg, min, max) * 2); // 0–2 scale steps
+  const shift = avg === null ? 0 : Math.round(norm(avg, min, max) * (s.chordShift ?? 2)); // scale steps
+  const silentBelow = s.silentBelow ?? 0.02;
+  const quiet = s.quietestLayer ?? -18, loud = s.loudestLayer ?? -6;
   st.loudestStrength = -1;
 
   names.forEach((name, i) => {
@@ -256,9 +259,9 @@ export function layers(features, cfg, inst, time) {
     if (!layerInst || !gain) return;
 
     // TODO(Aahana): features.layers[name] is a placeholder until the analyzer measures layers.
-    const strength = Math.min(1, hasLayers ? (features.layers[name] ?? 0) : LAYER_PLACEHOLDER);
-    const db = strength <= 0.02 ? LAYER_SILENT_DB : -30 + 30 * strength;
-    gain.volume.rampTo(db, 0.5);
+    const strength = Math.min(1, hasLayers ? (features.layers[name] ?? 0) : (s.placeholderStrength ?? 0.3));
+    const db = strength <= silentBelow ? SILENT_DB : quiet + (loud - quiet) * strength;
+    gain.volume.rampTo(db, s.layerFade ?? 0.5);
     if (strength > st.loudestStrength) { st.loudest = name; st.loudestStrength = strength; }
 
     const idx = Math.min(notes.length - 1, Math.round(((i + 0.5) / names.length) * (notes.length - 3)) + shift);
@@ -267,16 +270,17 @@ export function layers(features, cfg, inst, time) {
     const tense = hasLayers && s.tensionAbove !== undefined && strength > s.tensionAbove;
 
     if (layerInst.percussive) {
-      if (strength <= 0.02) return;
-      if (ls.lastStrike !== undefined && time - ls.lastStrike < RESTRIKE_GAP) return;
-      layerInst.triggerAttackRelease(midiToNote(midi + (tense ? 1 : 0)), 1, time, 0.3 + 0.5 * strength);
+      if (strength <= silentBelow) return;
+      if (ls.lastStrike !== undefined && time - ls.lastStrike < (s.bellGap ?? 1.2)) return;
+      const soft = s.bellSoftest ?? 0.3, hard = s.bellLoudest ?? 0.8;
+      layerInst.triggerAttackRelease(midiToNote(midi + (tense ? 1 : 0)), 1, time, soft + (hard - soft) * strength);
       ls.lastStrike = time;
       return;
     }
 
-    if (ls.lastChange !== undefined && time - ls.lastChange < MIN_CHANGE_GAP) return;
-    const want = new Map([[midi, 0.4]]);
-    if (tense) want.set(midi + 1, 0.12);
+    if (ls.lastChange !== undefined && time - ls.lastChange < (s.chordChangeGap ?? 0.5)) return;
+    const want = new Map([[midi, s.layerVelocity ?? 0.4]]);
+    if (tense) want.set(midi + 1, s.tensionVelocity ?? 0.12);
     const key = [...want.keys()].join();
     if (key === ls.lastKey) return;
     holdNotes(layerInst, ls, want, time);
@@ -321,17 +325,30 @@ export function scanColumn(features, cfg, inst, time, col) {
   const names = [...new Set(midis)].sort((a, b) => a - b).map(midiToNote);
   if (!names.length) return [];
 
+  const sc = TUNING.scan;
   voice.panner?.pan.setValueAtTime(colToPan(col, gw), time);
-  // Aerosols have no single instrument: scan through the loudest layer of the last frame.
-  const target = voice.inst ?? voice.layers[voice.state.loudest] ?? Object.values(voice.layers)[0];
+  // Aerosols have no single instrument: scan through the loudest layer of the last frame
+  // (the first non-bell layer if nothing has played yet), and make sure that layer is audible.
+  let target = voice.inst;
+  if (!target) {
+    const layerNames = Object.keys(voice.layers);
+    const name = voice.state.loudest ?? layerNames.find((n) => !voice.layers[n].percussive) ?? layerNames[0];
+    target = voice.layers[name];
+    const gain = voice.layerGains[name];
+    if (gain && !voice.state.scanLevelSet) {
+      gain.volume.setValueAtTime(Math.max(gain.volume.value, sc.layerLevel), time);
+      voice.state.scanLevelSet = true;
+    }
+  }
+  if (!target) return [];
   if (target.percussive) {
     const st = voice.state;
     const t = Math.max(time, (st.lastHit ?? 0) + 0.01);
-    target.triggerAttackRelease(names[0], '16n', t, 0.6); // monophonic: lowest note only
+    target.triggerAttackRelease(names[0], sc.step, t, sc.drumVelocity); // monophonic: lowest note only
     st.lastHit = t;
     return names.slice(0, 1);
   }
-  names.forEach((n) => target.triggerAttackRelease(n, '8n', time, 0.3));
+  names.forEach((n) => target.triggerAttackRelease(n, sc.noteLength, time, sc.velocity));
   return names;
 }
 
