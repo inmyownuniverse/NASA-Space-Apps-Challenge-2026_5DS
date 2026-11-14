@@ -135,7 +135,8 @@ function tick(t) {
   if (t - lastT < STEP && t >= lastT) return;
   lastT = t;
 
-  const features = analyze(video, cfg);
+  // No video file yet: ask the analyser for sample data explicitly so the dataset still sounds.
+  const features = analyze(video, cfg, { fake: missing });
   playFrame(features, cfg, t);
   describe(features, cfg, t);
   // TODO(Freia): in Scan mode, play features.columns[scanColumn] as a chord instead.
