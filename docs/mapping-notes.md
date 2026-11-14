@@ -164,6 +164,11 @@ Short plain notes on what each feature does and why it matters. One line per fea
   panel shows the exact pixel colour, where it sits on the colour bar, the real value it stands for
   (for example 28.9 °C) and the note it became. It is the one-glance proof that the music comes from
   the data, not from how pretty the colours are. Screen readers hear the same thing as a short sentence.
+  To be accurate it reads a small patch of pixels, not just one: it skips white current lines, grey
+  land and the black background, matches the remaining colours to the colour bar the way people see
+  colour, and takes the middle value. If the spot itself has no water colour it uses the nearest ocean
+  pixel and says so. When there is no value it says why: land or no data, a current line, or a colour
+  outside the colour bar.
 - **Shareable links.** The address always matches what you are hearing, for example
   `index.html?dataset=sst&t=30&mode=scan`. The "Copy link" button copies a link to this exact moment,
   so anyone (a judge, a teacher, another website) opens the same dataset, time and mode. Browsers only

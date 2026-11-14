@@ -2,23 +2,33 @@
 // Explore mode: move a finger, mouse or arrow keys over the map and hear the value at that spot.
 // The proof panel shows how the sound was worked out: the pixel colour, where that colour sits on
 // the colour bar, the real value it stands for, and the note that was played.
+// Colour matching for one spot lives in colormatch.js (a small patch, matched in CIELAB).
+// Add ?debug=1 to the address to see exactly which video pixel was read.
 
-import { colorToValue } from './colorbar.js';
+import { readPatch, PATCH, SEARCH } from './colormatch.js';
 import { playProbe, noteForValue } from './sound/engine.js';
 import { tuned } from './sound/tuning.js';
 import { valueRange } from './sound/scales.js';
 import { demoFeatures } from './sound/demo.js';
 import { announce, buzz } from './a11y.js';
 
-const SAMPLES = 5;          // 5 × 5 sample points per cell, like the analyser
 const POINTER_GAP_MS = 120; // at most one probe per 120 ms while dragging
 const ANNOUNCE_GAP_MS = 700;
+const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
 
 const work = document.createElement('canvas');
 const wctx = work.getContext('2d', { willReadFrequently: true });
 
 const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
 const spokenUnit = (unit) => (unit === '°C' ? 'degrees Celsius' : unit ?? '');
+
+// What to say when there is no value, by reason (see colormatch.readPatch).
+const MISS = {
+  land: 'Land or no data here.',
+  line: 'Current line, no data here.',
+  outside: 'This colour is outside the colour bar range.',
+  sample: 'The sample data has nothing at this spot.',
+};
 
 function direction(col, row, gw, gh) {
   const ns = row < gh / 3 ? 'north' : row >= (2 * gh) / 3 ? 'south' : '';
@@ -35,48 +45,39 @@ function fit(canvas, vw, vh) {
   return { s, ox: (canvas.width - vw * s) / 2, oy: (canvas.height - vh * s) / 2 };
 }
 
+function cropOf(cfg, vw, vh) {
+  return cfg.crop ?? { x: 0, y: 0, w: vw, h: vh };
+}
+
 /** Cell rectangle in video pixels. */
 function cellRect(cfg, col, row, vw, vh) {
-  const crop = cfg.crop ?? { x: 0, y: 0, w: vw, h: vh };
+  const crop = cropOf(cfg, vw, vh);
   const w = crop.w / cfg.grid.w;
   const h = crop.h / cfg.grid.h;
   return { x: crop.x + col * w, y: crop.y + row * h, w, h };
 }
 
 /**
- * Read one grid cell from the video frame on screen.
- * @returns {{ rgb: number[]|null, value: number|null, sample: boolean }}
+ * Read the spot (vx, vy), in source video pixels, from the frame on screen.
+ * @returns {{ status: string, value: number|null, rgb: number[]|null, at: number[]|null,
+ *            valid?: number, total?: number, dE?: number|null, distance?: number, sample: boolean }}
  */
-function readCell(video, cfg, col, row, t) {
+function readSpot(video, cfg, vx, vy, col, row, t) {
   if (!video || video.readyState < 2 || !video.videoWidth) {
-    const f = demoFeatures(cfg, t);
-    return { rgb: null, value: f.grid[row * cfg.grid.w + col], sample: true };
+    const value = demoFeatures(cfg, t).grid[row * cfg.grid.w + col];
+    return { status: value === null ? 'sample' : 'ok', value, rgb: null, at: null, sample: true };
   }
-  const r = cellRect(cfg, col, row, video.videoWidth, video.videoHeight);
-  const w = Math.max(1, Math.round(r.w)), h = Math.max(1, Math.round(r.h));
-  work.width = w;
-  work.height = h;
-  wctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, w, h);
-  const px = wctx.getImageData(0, 0, w, h).data;
-  const stops = cfg.colorbar.stops;
-  const maxDist = cfg.colorbar.maxDist ?? 60;
-  const hits = [];
-  let centre = null;
-  for (let sy = 0; sy < SAMPLES; sy++) {
-    for (let sx = 0; sx < SAMPLES; sx++) {
-      const x = Math.floor((w * (sx + 0.5)) / SAMPLES);
-      const y = Math.floor((h * (sy + 0.5)) / SAMPLES);
-      const i = (y * w + x) * 4;
-      const rgb = [px[i], px[i + 1], px[i + 2]];
-      if (sx === 2 && sy === 2) centre = rgb;
-      const v = colorToValue(rgb[0], rgb[1], rgb[2], stops, maxDist);
-      if (v !== null) hits.push({ v, rgb });
-    }
-  }
-  if (!hits.length) return { rgb: centre, value: null, sample: false };
-  hits.sort((a, b) => a.v - b.v);
-  const mid = hits[Math.floor(hits.length / 2)]; // median, like the analyser
-  return { rgb: mid.rgb, value: mid.v, sample: false };
+  // Copy a small square around the spot at full resolution (no scaling, so no blending).
+  const r = SEARCH;
+  const sx = Math.max(0, vx - r), sy = Math.max(0, vy - r);
+  const sw = Math.min(video.videoWidth, vx + r + 1) - sx;
+  const sh = Math.min(video.videoHeight, vy + r + 1) - sy;
+  work.width = sw;
+  work.height = sh;
+  wctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  const px = wctx.getImageData(0, 0, sw, sh).data;
+  const res = readPatch(px, sw, sh, vx - sx, vy - sy, cfg.colorbar.stops);
+  return { ...res, at: [res.at[0] + sx, res.at[1] + sy], sample: false };
 }
 
 // ---------- proof panel ----------
@@ -95,6 +96,7 @@ function panelEl() {
     <div class="probe-bar" aria-hidden="true"><span class="probe-marker"></span></div>
     <p class="probe-bar-ends"><span class="probe-min"></span><span class="probe-max"></span></p>
     <p class="probe-value"></p>
+    <p class="probe-how"></p>
     <p class="probe-note"></p>`;
   const readout = document.getElementById('readout');
   (readout?.parentElement ?? document.body).insertBefore(el, readout?.nextSibling ?? null);
@@ -109,11 +111,12 @@ function gradientCss(cfg) {
 }
 
 function updatePanel(panel, cfg, info) {
-  const { col, row, rgb, value, note, hot, sample } = info;
+  const { col, row, spot, note, hot } = info;
   const gw = cfg.grid.w, gh = cfg.grid.h;
   const unit = cfg.colorbar.unit ?? '';
   const [min, max] = valueRange(cfg);
   const q = (sel) => panel.querySelector(sel);
+  const { value, rgb, status, sample } = spot;
 
   q('.probe-where').textContent = `Row ${row + 1} of ${gh}, column ${col + 1} of ${gw} (${direction(col, row, gw, gh)})`;
   q('.probe-swatch').style.background = rgb ? `rgb(${rgb.join(',')})` : 'transparent';
@@ -126,25 +129,30 @@ function updatePanel(panel, cfg, info) {
   const marker = q('.probe-marker');
   if (value === null) {
     marker.hidden = true;
-    q('.probe-value').textContent = sample
-      ? 'The sample data has nothing at this spot.'
-      : 'This colour is not on the colour bar (land, labels or background), so there is no data here.';
+    q('.probe-value').textContent = MISS[status] ?? MISS.land;
+    q('.probe-how').textContent = sample ? '' : `None of the ${spot.total} pixels around this spot matched the colour bar.`;
     q('.probe-note').textContent = 'Note played: none';
-  } else {
-    marker.hidden = false;
-    marker.style.left = `${((value - min) / (max - min || 1)) * 100}%`;
-    const pos = Math.round(((value - min) / (max - min || 1)) * 100);
-    q('.probe-value').textContent = `Colour bar match: ${pos}% along the bar, which means ${fmt(value)} ${unit}.${hot ? ' Hotspot.' : ''}`;
-    q('.probe-note').textContent = `Note played: ${note ?? 'none'}`;
+    return;
   }
+  marker.hidden = false;
+  marker.style.left = `${((value - min) / (max - min || 1)) * 100}%`;
+  const pos = Math.round(((value - min) / (max - min || 1)) * 100);
+  const lead = status === 'nearest' ? `Nearest ocean value, ${spot.distance} pixels away: ` : 'Colour bar match: ';
+  q('.probe-value').textContent = `${lead}${pos}% along the bar, which means ${fmt(value)} ${unit}.${hot ? ' Hotspot.' : ''}`;
+  q('.probe-how').textContent = sample ? ''
+    : status === 'nearest'
+      ? `Too few coloured pixels right here (white current lines, land or background), so the closest matching pixel was used.`
+      : `Middle value of the ${spot.valid} of ${spot.total} pixels around this spot that match the colour bar (white lines, land and background are skipped).`;
+  q('.probe-note').textContent = `Note played: ${note ?? 'none'}`;
 }
 
 // ---------- explore mode ----------
 
 /**
  * Turn on Explore mode for the overlay canvas.
- * Pointer: move or tap over the map. Keyboard: focus the map, then arrow keys move one cell,
- * Home / End jump to the west / east edge, Enter plays the current cell again.
+ * Pointer: move or tap over the map (reads the exact spot). Keyboard: focus the map, then arrow
+ * keys move one cell (reads the cell centre), Home / End jump to the west / east edge,
+ * Enter plays the current spot again.
  *
  * @param {HTMLCanvasElement} canvas overlay canvas above the video
  * @param {object} cfg dataset config
@@ -167,12 +175,22 @@ export function enableExplore(canvas, cfg) {
   canvas.setAttribute('aria-roledescription', 'map explorer');
   canvas.setAttribute('aria-label', `Explore the ${cfg.title} map. Arrow keys move one cell, Home and End jump west and east, Enter plays the spot again.`);
 
+  const vsize = () => [video.videoWidth || canvas.width, video.videoHeight || canvas.height];
   let col = Math.floor(gw / 2), row = Math.floor(gh / 2);
+  let point = null;      // exact spot in video pixels from the pointer; null = cell centre
+  let lastSpot = null;   // last reading, for the debug marker
   let lastPointer = 0, lastAnnounce = 0;
+
+  function spotPixel() {
+    if (point) return point;
+    const [vw, vh] = vsize();
+    const r = cellRect(cfg, col, row, vw, vh);
+    return [Math.round(r.x + r.w / 2), Math.round(r.y + r.h / 2)];
+  }
 
   function drawCursor() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const vw = video.videoWidth || canvas.width, vh = video.videoHeight || canvas.height;
+    const [vw, vh] = vsize();
     const r = cellRect(cfg, col, row, vw, vh);
     const { s, ox, oy } = fit(canvas, vw, vh);
     const x = ox + r.x * s, y = oy + r.y * s, w = r.w * s, h = r.h * s;
@@ -182,48 +200,74 @@ export function enableExplore(canvas, cfg) {
     ctx.lineWidth = 1;
     ctx.strokeStyle = '#000';
     ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+
+    if (!DEBUG) return;
+    // Debug: the spot read (magenta cross), the 7 × 7 patch (magenta box) and the pixel whose
+    // colour is shown in the panel (cyan dot). All drawn from source-video pixel coordinates.
+    const [px, py] = spotPixel();
+    const cx = ox + (px + 0.5) * s, cy = oy + (py + 0.5) * s;
+    ctx.strokeStyle = '#ff00ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, cy); ctx.lineTo(cx + 12, cy);
+    ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy + 12);
+    ctx.stroke();
+    const half = Math.floor(PATCH / 2);
+    ctx.strokeRect(ox + (px - half) * s, oy + (py - half) * s, PATCH * s, PATCH * s);
+    if (lastSpot?.at) {
+      ctx.fillStyle = '#00ffff';
+      ctx.beginPath();
+      ctx.arc(ox + (lastSpot.at[0] + 0.5) * s, oy + (lastSpot.at[1] + 0.5) * s, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function probe(forceAnnounce) {
     const t = video.currentTime || performance.now() / 1000;
-    const { rgb, value, sample } = readCell(video, cfg, col, row, t);
+    const [vx, vy] = spotPixel();
+    const spot = readSpot(video, cfg, vx, vy, col, row, t);
+    lastSpot = spot;
+    const value = spot.value;
     const hot = value !== null && value > hotAbove;
     const note = value !== null ? playProbe(cfg, value, col) ?? noteForValue(cfg, value) : null;
     if (hot) buzz(30);
     drawCursor();
-    updatePanel(panel, cfg, { col, row, rgb, value, note, hot, sample });
+    updatePanel(panel, cfg, { col, row, spot, note, hot });
+    if (DEBUG) console.debug('explore', { vx, vy, ...spot });
 
     const now = performance.now();
     if (!forceAnnounce && now - lastAnnounce < ANNOUNCE_GAP_MS) return;
     lastAnnounce = now;
     const where = `Row ${row + 1}, column ${col + 1}, ${direction(col, row, gw, gh)}.`;
     const what = value === null
-      ? 'No data here.'
-      : `${fmt(value)} ${spokenUnit(cfg.colorbar.unit)}${note ? `, note ${note}` : ''}.${hot ? ' Hotspot.' : ''}${sample ? ' Sample data.' : ''}`;
+      ? MISS[spot.status] ?? MISS.land
+      : `${spot.status === 'nearest' ? 'Nearest ocean value, ' : ''}${fmt(value)} ${spokenUnit(cfg.colorbar.unit)}${note ? `, note ${note}` : ''}.${hot ? ' Hotspot.' : ''}${spot.sample ? ' Sample data.' : ''}`;
     announce(`${where} ${what}`);
   }
 
-  function cellFromPointer(e) {
-    const rect = canvas.getBoundingClientRect();
-    const vw = video.videoWidth || canvas.width, vh = video.videoHeight || canvas.height;
+  /** Pointer position to source video pixel and grid cell (null outside the map area). */
+  function fromPointer(e) {
+    const rect = canvas.getBoundingClientRect(); // CSS pixels, so devicePixelRatio doesn't matter
+    const [vw, vh] = vsize();
     const { s, ox, oy } = fit(canvas, vw, vh);
     const x = (((e.clientX - rect.left) / rect.width) * canvas.width - ox) / s;
     const y = (((e.clientY - rect.top) / rect.height) * canvas.height - oy) / s;
-    const crop = cfg.crop ?? { x: 0, y: 0, w: vw, h: vh };
+    const crop = cropOf(cfg, vw, vh);
     const c = Math.floor(((x - crop.x) / crop.w) * gw);
     const r = Math.floor(((y - crop.y) / crop.h) * gh);
     if (c < 0 || c >= gw || r < 0 || r >= gh) return null;
-    return [c, r];
+    return { cell: [c, r], px: [Math.floor(x), Math.floor(y)] };
   }
 
   function onPointer(e) {
-    const cell = cellFromPointer(e);
-    if (!cell) return;
+    const hit = fromPointer(e);
+    if (!hit) return;
     const now = performance.now();
-    const changed = cell[0] !== col || cell[1] !== row;
-    if (e.type === 'pointermove' && (!changed || now - lastPointer < POINTER_GAP_MS)) return;
+    const moved = !point || hit.px[0] !== point[0] || hit.px[1] !== point[1];
+    if (e.type === 'pointermove' && (!moved || now - lastPointer < POINTER_GAP_MS)) return;
     lastPointer = now;
-    [col, row] = cell;
+    [col, row] = hit.cell;
+    point = hit.px;
     probe(e.type === 'pointerdown');
   }
 
@@ -232,8 +276,9 @@ export function enableExplore(canvas, cfg) {
     if (moves[e.key]) {
       col = Math.min(gw - 1, Math.max(0, col + moves[e.key][0]));
       row = Math.min(gh - 1, Math.max(0, row + moves[e.key][1]));
-    } else if (e.key === 'Home') col = 0;
-    else if (e.key === 'End') col = gw - 1;
+      point = null;
+    } else if (e.key === 'Home') { col = 0; point = null; }
+    else if (e.key === 'End') { col = gw - 1; point = null; }
     else if (e.key !== 'Enter') return;
     e.preventDefault();
     e.stopPropagation(); // keep the arrows from scrubbing or changing the volume
@@ -260,4 +305,9 @@ export function enableExplore(canvas, cfg) {
     if (saved.role) canvas.setAttribute('role', saved.role);
     if (saved.label) canvas.setAttribute('aria-label', saved.label);
   };
+}
+
+/** For tests: read one spot of the current frame (source video pixels). */
+export function readSpotForTest(video, cfg, vx, vy) {
+  return readSpot(video, cfg, vx, vy, 0, 0, 0);
 }
