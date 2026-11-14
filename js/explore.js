@@ -126,7 +126,9 @@ function updatePanel(panel, cfg, info) {
   const marker = q('.probe-marker');
   if (value === null) {
     marker.hidden = true;
-    q('.probe-value').textContent = 'This colour is not on the colour bar (land, labels or background), so there is no data here.';
+    q('.probe-value').textContent = sample
+      ? 'The sample data has nothing at this spot.'
+      : 'This colour is not on the colour bar (land, labels or background), so there is no data here.';
     q('.probe-note').textContent = 'Note played: none';
   } else {
     marker.hidden = false;
