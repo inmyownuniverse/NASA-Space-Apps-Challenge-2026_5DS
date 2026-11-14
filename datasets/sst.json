@@ -22,13 +22,21 @@
     "instrument": "warmPad",
     "valueTo": "pitch",
     "changeTo": "filter",
-    "maxVoices": 6,
-    "smoothFrames": 3,
-    "tensionAbove": 28
+    "filter": [600, 4500],
+    "maxVoices": 5,
+    "smoothFrames": 4,
+    "tensionAbove": 28,
+    "symphonyLevel": -4,
+    "legendExamples": [
+      { "values": [24, 27, 30] },
+      { "values": [6, 3, 0] },
+      { "values": [15], "sweep": true }
+    ]
   },
   "legend": [
     { "sound": "high notes", "means": "warm water" },
-    { "sound": "low notes", "means": "cold water" }
+    { "sound": "low notes", "means": "cold water" },
+    { "sound": "brighter, sweeping tone", "means": "fast-moving currents" }
   ],
   "_todo": "Aahana: measure crop box and sample real colorbar stops. Freia: tune sound block."
 }

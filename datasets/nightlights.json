@@ -22,9 +22,14 @@
     "instrument": "glass",
     "valueTo": "note density",
     "changeTo": "sparkle",
-    "maxVoices": 8,
+    "maxVoices": 6,
     "smoothFrames": 2,
-    "tensionAbove": 80
+    "litAbove": 5,
+    "symphonyLevel": -8,
+    "legendExamples": [
+      { "values": [40, 55, 70, 85, 60, 45] },
+      { "values": [20, 100] }
+    ]
   },
   "legend": [
     { "sound": "more sparkling notes", "means": "more lit-up area" },

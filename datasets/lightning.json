@@ -17,14 +17,18 @@
   },
   "sound": {
     "mapper": "events",
-    "scale": "C major pentatonic",
+    "scale": "C minor pentatonic",
     "octaves": [2, 4],
     "instrument": "drum",
     "valueTo": "rhythm",
-    "changeTo": "volume",
+    "changeTo": "none",
     "maxVoices": 4,
     "smoothFrames": 1,
-    "tensionAbove": 0.8
+    "symphonyLevel": -2,
+    "legendExamples": [
+      { "flashes": [{ "x": 16, "y": 8, "value": 1 }] },
+      { "flashes": [{ "x": 0, "y": 8, "value": 1 }, { "x": 31, "y": 8, "value": 1 }] }
+    ]
   },
   "legend": [
     { "sound": "a drum hit", "means": "a lightning flash" },
