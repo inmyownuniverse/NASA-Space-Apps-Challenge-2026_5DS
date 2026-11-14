@@ -48,8 +48,8 @@ button:hover { background: #21314a; }
 .player-heading { margin-bottom: .85rem; }
 .player-heading h3 { margin-top: .2rem; font-size: clamp(1.3rem, 2.3vw, 2.05rem); line-height: 1.16; letter-spacing: -.04em; }
 .stage { position: relative; display: grid; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; border: 1px solid var(--border); background: repeating-linear-gradient(90deg, transparent 0 9.8%, #26334855 10%), repeating-linear-gradient(0deg, #0b142326 0 9.8%, #26334855 10%), #080f1b; }
-.stage > .media, .media img, .media video { position: absolute; inset: 0; width: 100%; height: 100%; }
-.media img, .media video { object-fit: contain; background: #060911; }
+.stage > video, .stage > .media, .media img, .media video { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage > video, .media img, .media video { object-fit: contain; background: #060911; }
 .media-state { position: absolute; top: .65rem; left: .65rem; padding: .35rem .55rem; border: 1px solid #617187; border-radius: 5px; background: #09121ef2; font: .72rem var(--mono); }
 .exploring { cursor: crosshair; }
 .scan-line, .cursor { position: absolute; pointer-events: none; z-index: 1; }
@@ -102,7 +102,7 @@ button:hover { background: #21314a; }
   .shell { width: calc(100% - 1.5rem); }
   .layout, .tiles { grid-template-columns: minmax(0, 1fr); }
   .datasets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stage { min-height: 200px; }
+  .stage:not(:has(> #overlay)) { min-height: 200px; }
   .details .readout { order: -1; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -683,3 +683,163 @@ button:hover { background: #21314a; }
 .player-message { position: absolute; inset: auto .65rem .65rem; z-index: 2; padding: .55rem .75rem; background: #090d15ee; border-radius: 6px; pointer-events: none; }
 .legend-first { display: block; margin-top: .65rem; font-size: .8rem; }
 #legend li.speaking, #play-dialog-content li.speaking { background: #ffffff12; }
+
+/* Play layout follows the reference's title, stage, transport and notes rows. */
+.track-number, .track-thumbnail { display: none; }
+.play-console main.shell { width: min(1520px, calc(100% - clamp(2rem, 10vw, 10rem))); }
+.play-console #jukebox {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-areas: "heading description" "player library" "transport transport" "notes notes";
+  gap: clamp(.85rem, 1.5vw, 1.5rem) clamp(1rem, 3vw, 3rem);
+  padding-top: 1rem;
+}
+.play-console #jukebox .play-summary { display: contents; }
+.play-heading { grid-area: heading; }
+.play-summary h2 { margin: .3rem 0 .55rem; font-size: clamp(1.75rem, 3.2vw, 3.25rem); font-weight: 700; }
+#play-summary-dates { display: inline-block; color: var(--text); }
+.play-console #dataset-notes {
+  margin: 0 0 0 .65rem;
+  min-height: 32px;
+  border: 0;
+  border-left: 1px solid #56585d;
+  border-radius: 0;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+#play-summary-description {
+  grid-area: description;
+  align-self: center;
+  border-left: 1px solid #56585d;
+  padding-left: clamp(.85rem, 2vw, 2rem);
+  margin: 0;
+  color: var(--text);
+}
+.play-console #jukebox .player { display: contents; }
+.play-console #jukebox .stage { grid-area: player; aspect-ratio: 16 / 9; }
+.play-console #jukebox :is(.instruction, .modes) { display: none; }
+.play-console #jukebox .library { padding: 0; }
+.play-console .library h3 { font-size: clamp(1.1rem, 1.75vw, 1.6rem); }
+.play-console .datasets li:last-child { border-bottom: 1px solid var(--console-edge); }
+.play-console .datasets button {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 24%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(.5rem, 1.2vw, 1.2rem);
+  padding: .65rem .85rem;
+}
+.play-console .datasets button::after { content: ""; border-block: 7px solid transparent; border-left: 11px solid currentColor; }
+.play-console .track-dot { display: none; }
+.play-console .track-number { display: block; font: .8rem var(--mono); }
+.play-console .track-thumbnail { display: block; width: 100%; aspect-ratio: 1.55; object-fit: cover; border-radius: 5px; background: #10151c; }
+.play-console .track-copy strong { font-size: clamp(.85rem, 1.2vw, 1.1rem); }
+.play-console .track-copy small { text-transform: uppercase; }
+.play-console #jukebox .controls {
+  grid-area: transport;
+  padding: .1rem .35rem .8rem;
+  border: 0;
+  border-bottom: 1px solid #56585d;
+  gap: clamp(.4rem, 2vw, 2rem);
+}
+.play-console .transport { flex-wrap: nowrap; }
+.play-console .controls label > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.play-console .controls .volume { padding-inline: clamp(.4rem, 1.5vw, 1.5rem); border-inline: 1px solid #56585d; }
+.play-console .controls button:not(.primary) { background: transparent; border-color: transparent; }
+.play-console #play-btn {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  position: relative;
+  flex: none;
+  color: transparent;
+  border: 0;
+  background: #f2f2f4;
+}
+.play-console #play-btn::before { content: ""; position: absolute; inset: 50% auto auto 53%; transform: translate(-50%, -50%); border-block: 10px solid transparent; border-left: 15px solid #101114; }
+.play-console #play-btn[data-playing="true"]::before { width: 13px; height: 18px; inset-inline-start: 50%; border-block: 0; border-inline: 4px solid #101114; }
+.play-console .details { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-areas: "legend mapping" "readout readout"; gap: 1rem; }
+.play-console #jukebox .details > .info { border: 0; border-radius: 0; min-height: 0; background: transparent; box-shadow: none; padding: 0 .7rem; }
+.play-console #jukebox .details > :nth-child(4) { border-left: 1px solid #56585d; padding-left: clamp(1rem, 3vw, 3rem); }
+.play-console #jukebox .readout { border-top: 1px solid var(--console-edge); padding-block: 1rem; }
+.play-console .details h3 { font-size: clamp(1.15rem, 1.7vw, 1.55rem); }
+.play-console .details p { font-size: .97rem; }
+#legend-scale { display: none; }
+.play-console #legend-scale { display: block; margin-block: .85rem; }
+.legend-gradient { height: 1.05rem; background: linear-gradient(90deg, var(--legend-colors)); }
+.legend-endpoints { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; margin-top: .4rem; }
+.legend-endpoints span:last-child { text-align: right; }
+.play-console #legend-scale:not([hidden]) + #legend { display: none; }
+@media (max-width: 800px) {
+  .play-console #jukebox { grid-template-columns: minmax(0, 1fr); grid-template-areas: "heading" "description" "player" "transport" "library" "notes"; }
+  .play-console .datasets button { grid-template-columns: 2ch 68px minmax(0, 1fr) auto; }
+}
+@media (max-width: 550px) {
+  .play-console .details { grid-template-columns: minmax(0, 1fr); grid-template-areas: "legend" "mapping" "readout"; }
+  .play-console #jukebox .details > :nth-child(4) { border-left: 0; padding-left: .7rem; }
+  .play-console .transport { flex-basis: 100%; }
+}
+
+.add-page {
+  background: linear-gradient(#0506089c, #050608b8), url("../media/starfield.png") center top / 960px 640px repeat,
+    radial-gradient(ellipse at 50% 12%, #171a21, #060709 70%);
+  --focus: #b8e2eb;
+  --accent: #c2e4eb;
+}
+.add-page .header { border-color: transparent; text-shadow: 0 1px 5px #000, 0 2px 12px #000; }
+.add-workspace { width: min(1520px, calc(100% - clamp(2rem, 10vw, 10rem))); padding-block: 1rem 3rem; }
+.add-heading, .add-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem clamp(1rem, 3vw, 3rem); }
+.add-heading { align-items: center; padding-block: .6rem 1.5rem; }
+.add-heading h1 { font-size: clamp(1.75rem, 3.2vw, 3.25rem); line-height: 1.1; letter-spacing: -.045em; margin-top: .35rem; }
+.add-heading > p { border-left: 1px solid #56585d; padding-left: 1rem; color: var(--muted); }
+.add-layout { align-items: start; }
+.add-layout .panel { border: 0; background: transparent; }
+.add-layout h2 { font-size: clamp(1.1rem, 1.75vw, 1.6rem); margin-bottom: .8rem; }
+.add-layout .stage { min-height: 0; background: #080a0e; border: 0; border-radius: 3px; }
+.add-layout .pick-on { outline: 2px solid var(--focus); outline-offset: -2px; cursor: crosshair; }
+.add-layout fieldset { min-width: 0; margin: 0 0 1rem; padding: .7rem 0 1rem; border: 0; border-bottom: 1px solid #30353c; }
+.add-layout legend { font-weight: 600; }
+.add-layout .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.add-layout .fields label { display: grid; gap: .25rem; font-size: .85rem; min-width: 0; }
+.add-layout .fields label:has(input[type="file"], input[type="url"], select) { grid-column: 1 / -1; }
+.add-layout :is(input, select, textarea) { width: 100%; min-width: 0; background: #101216; border: 1px solid #363a41; border-radius: 5px; color: inherit; padding: .45rem .55rem; font: inherit; }
+.add-layout button { background: #14171b; border-color: #363a41; }
+.add-layout button:is(:hover, [aria-pressed="true"]) { border-color: var(--accent); }
+.add-layout .row-buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .65rem; }
+.add-layout .step-help { color: var(--muted); font-size: .87rem; }
+.add-layout .gradient { height: 1rem; border: 1px solid #363a41; border-radius: 3px; }
+.add-layout textarea { min-height: 10rem; font: .8rem/1.4 var(--mono); }
+@media (max-width: 850px) {
+  .add-heading, .add-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .add-page #site-navigation:has(+ #menu-toggle[aria-expanded="true"]) { background: #101216; }
+}
+
+.play-console[data-studio-view="scan"] #jukebox,
+.play-console[data-studio-view="explore"] #jukebox {
+  grid-template-areas: "heading description" "player library" "instruction library" "transport transport" "notes notes";
+}
+.play-console:is([data-studio-view="scan"], [data-studio-view="explore"]) #jukebox .instruction {
+  grid-area: instruction;
+  display: block;
+  padding: 0;
+  color: var(--muted);
+}
+.play-console #symphony { padding-top: 1rem; }
+.play-console .symphony-heading { margin-bottom: clamp(1rem, 2vw, 2rem); }
+.play-console .symphony-heading h2 {
+  margin-top: .3rem;
+  font-size: clamp(1.75rem, 3.2vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: -.045em;
+}
+.play-console #tiles .tile { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.play-console #tiles .tile-copy { padding: .75rem .25rem 1rem; border-bottom: 1px solid var(--console-edge); }
+.play-console #tiles .tile-copy label { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin-top: .35rem; color: var(--muted); font-size: .85rem; }
+.play-console #tiles input { accent-color: #b8e2eb; }
+.play-console #symphony-controls { padding: .8rem .25rem; border: 0; border-top: 1px solid var(--console-edge); border-radius: 0; background: transparent; }
+@media (max-width: 800px) {
+  .play-console:is([data-studio-view="scan"], [data-studio-view="explore"]) #jukebox {
+    grid-template-areas: "heading" "description" "player" "instruction" "transport" "library" "notes";
+  }
+}

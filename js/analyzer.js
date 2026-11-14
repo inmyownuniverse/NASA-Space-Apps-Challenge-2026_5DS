@@ -48,8 +48,7 @@ import { colorToValue } from './colorbar.js';
 
 const work = typeof document !== 'undefined' ? document.createElement('canvas') : null;
 const ctx = work ? work.getContext('2d', { willReadFrequently: true }) : null;
-let prevGrid = null;
-let prevTime = null;
+let history = new WeakMap();
 
 /**
  * Safe empty features returned when video is unready, missing, or processing fails.
@@ -128,6 +127,8 @@ export function analyze(video, cfg, opts = {}) {
   const stops = cfg?.colorbar?.stops;
   const maxDist = cfg?.colorbar?.maxDist ?? 60;
 
+  let { grid: prevGrid, time: prevTime } = history.get(video) ?? { grid: null, time: null };
+
   // Detect video seeking, looping, or large temporal jumps to prevent invalid change metrics
   const curTime = typeof video.currentTime === 'number' ? video.currentTime : null;
   if (curTime !== null && prevTime !== null) {
@@ -136,7 +137,7 @@ export function analyze(video, cfg, opts = {}) {
       prevGrid = null;
     }
   }
-  prevTime = curTime;
+
 
   try {
     if (work.width !== cropW || work.height !== cropH) {
@@ -219,7 +220,7 @@ export function analyze(video, cfg, opts = {}) {
       }
     }
     const change = prevGrid ? changed / grid.length : 0;
-    prevGrid = grid;
+    history.set(video, { grid, time: curTime });
 
     return {
       grid,
@@ -239,6 +240,5 @@ export function analyze(video, cfg, opts = {}) {
 
 /** Reset frame-to-frame state (call when switching dataset or seeking). */
 export function resetAnalyzer() {
-  prevGrid = null;
-  prevTime = null;
+  history = new WeakMap();
 }

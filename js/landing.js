@@ -1,3 +1,5 @@
+import { bindNavigation } from './navigation.js';
+
 const clamp = (value) => Math.max(0, Math.min(1, value));
 const smooth = (value) => value * value * (3 - 2 * value);
 
@@ -74,26 +76,12 @@ export function initLanding() {
 
   document.getElementById('previous-feature').addEventListener('click', () => changeFeature(-1));
   document.getElementById('next-feature').addEventListener('click', () => changeFeature(1));
-  const menu = document.getElementById('menu-toggle');
-  const setMenu = (open) => menu.setAttribute('aria-expanded', String(open));
-  menu.addEventListener('click', () => setMenu(menu.getAttribute('aria-expanded') !== 'true'));
-  document.getElementById('site-navigation').addEventListener('click', (event) => {
-    if (event.target.closest('a') && menu.getAttribute('aria-expanded') === 'true') {
-      setMenu(false);
-      menu.focus();
-    }
-  });
-  document.querySelector('.header').addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && menu.getAttribute('aria-expanded') === 'true') {
-      setMenu(false);
-      menu.focus();
-    }
-  });
+  const closeMenu = bindNavigation();
 
   return {
     setVisible(value) {
       visible = value;
-      setMenu(false);
+      closeMenu();
       if (visible && !started) {
         started = true;
         import('./vendor/three.module.js').then(async (three) => {
