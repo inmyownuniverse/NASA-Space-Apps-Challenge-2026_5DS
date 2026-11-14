@@ -206,11 +206,9 @@ function toggleEyes() {
     getCfg: () => current,
     isPlaying: player.isPlaying,
   });
-  const text = eyesClosed
-    ? 'Eyes-closed mode on. The picture is hidden and a short summary is spoken every 8 seconds. Press E to turn it off.'
-    : 'Eyes-closed mode off.';
-  speak(text);
-  announce(text);
+  // Turning on, eyes.js speaks its own introduction and the first summary.
+  if (!eyesClosed) speak('Eyes-closed mode off.');
+  announce(eyesClosed ? 'Eyes-closed mode on. Summaries are spoken every 8 seconds. Press E to turn it off.' : 'Eyes-closed mode off.');
 }
 
 function scrubBy(dt) {

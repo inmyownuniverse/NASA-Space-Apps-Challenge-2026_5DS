@@ -22,6 +22,8 @@ export const TUNING = {
     limiter: -3,       // ceiling the final mix can never go above, dB (stops clipping)
     lookAhead: 0.05,   // how far ahead notes are scheduled so they start cleanly, s
     voiceCap: 8,       // most notes one dataset may hold at once, whatever maxVoices says
+    duckDb: -6,        // how much the music dips while a spoken summary plays, dB
+    duckTime: 0.15,    // how fast the music dips and comes back, s
   },
 
   scan: {

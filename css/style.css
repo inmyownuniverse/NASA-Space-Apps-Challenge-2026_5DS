@@ -146,9 +146,11 @@ button[aria-pressed="true"], button[aria-current="true"] {
 
 /* Eyes-closed mode: hide the picture, keep everything else */
 .eyes-message { display: none; }
-.eyes-closed .stage video, .eyes-closed .stage canvas, .eyes-closed .player-message { visibility: hidden; }
+/* The video keeps rendering underneath (hiding it would stop the frame loop and the music);
+   an opaque black cover sits on top instead. */
 .eyes-closed .eyes-message {
-  display: flex; position: absolute; inset: 0; margin: 0; padding: 1.5rem;
+  display: flex; position: absolute; inset: 0; z-index: 5; margin: 0; padding: 1.5rem;
+  background: #000;
   align-items: center; justify-content: center; text-align: center; font-size: 1.4rem;
 }
 #eyes-btn[aria-pressed="true"] { outline: 2px solid var(--accent); }

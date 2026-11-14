@@ -3,7 +3,7 @@
 //
 // One dataset:   instrument(s) → [layer volume] → Panner → Filter → Level ───────┐
 // Symphony:      each dataset's voice → its own Tone.Channel (level) ───────────┤
-// Master chain:  mix trim → listener volume → Reverb → Limiter → speakers ◄────────────────────────────┘
+// Master chain:  mix trim → duck → listener volume → Reverb → Limiter → speakers ◄────────────────────────────┘
 //
 // Every number that changes the sound is in tuning.js. Configs passed in from outside
 // (datasets/*.json) are merged with tuning.js by tuned(cfg) before the mappers see them.
@@ -18,6 +18,7 @@ let started = false;
 let master = null;   // Tone.Volume — everything connects here (mix trim from tuning.js)
 let listener = null; // Tone.Volume — the listener's volume slider (setVolume)
 let listenerDb = -8; // slider value, kept so it survives retune and late initAudio
+let duck = null;     // Tone.Volume — dips the music while speech plays (duckMusic)
 let reverb = null;
 let limiter = null;
 let meter = null;    // Tone.Meter on the final output (used by the sound lab)
@@ -38,7 +39,8 @@ export async function initAudio() {
   limiter = new Tone.Limiter(m.limiter).toDestination();
   reverb = new Tone.Reverb({ decay: m.reverbDecay, wet: m.reverbWet }).connect(limiter);
   listener = new Tone.Volume(listenerDb).connect(reverb);
-  master = new Tone.Volume(m.volume).connect(listener);
+  duck = new Tone.Volume(0).connect(listener);
+  master = new Tone.Volume(m.volume).connect(duck);
   meter = new Tone.Meter({ smoothing: 0.8 });
   limiter.connect(meter);
 
@@ -333,6 +335,12 @@ export function releaseAll() {
 export function setVolume(db) {
   listenerDb = db;
   if (listener) listener.volume.rampTo(db, 0.05);
+}
+
+/** Dip the music a little while speech is playing (true), or bring it back (false). */
+export function duckMusic(on) {
+  if (!duck) return;
+  duck.volume.rampTo(on ? TUNING.master.duckDb : 0, TUNING.master.duckTime);
 }
 
 /** Loudness of the final mix right now, in dB (−Infinity when silent). For level checks. */
