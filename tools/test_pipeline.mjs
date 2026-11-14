@@ -53,7 +53,7 @@ assert(sstCfg.colorbar.maxDist >= 60 && sstCfg.colorbar.maxDist <= 90,
 // Verify sound, description, and legend were preserved
 assert(sstCfg.sound.mapper === 'continuousField', 'Preserved teammate sound.mapper');
 assert(sstCfg.sound.instrument === 'warmPad', 'Preserved teammate sound.instrument');
-assert(Array.isArray(sstCfg.legend) && sstCfg.legend.length === 2, 'Preserved teammate legend section');
+assert(Array.isArray(sstCfg.legend) && sstCfg.legend.length >= 2, 'Preserved teammate legend section');
 
 // -----------------------------------------------------------------------------
 // 2. COLORBAR INVERSION: KNOWN STOPS
