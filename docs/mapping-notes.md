@@ -40,13 +40,15 @@ is much louder than the others.
 ## Sea Surface Currents and Temperature (`sst`)
 
 **What you see.** The world's oceans, with currents drawn as moving streaks. The colour shows the
-water temperature at the surface: warm water is red and cold water is blue.
+water temperature at the surface, from 0 to 32 °C: cold water is blue, middle temperatures are green and
+yellow, and warm water is orange and red.
 
 **What we measure per frame.** Temperature sampled from visible coloured current streamlines across a 32x16 grid (°C, 0.0 to 32.0 °C). Note: `mean` reflects the average temperature of currently detected, illuminated streamline filaments, not a geographic area-weighted global ocean mean. `change` measures the visual advection and motion of streamlines across grid cells between frames, not a physical heating/cooling trend. Unknown areas, unlit ocean floor, and continents return null.
 
 **What you hear.**
 - A soft, slow pad chord that is always playing, like a held organ or string sound.
-- The main note follows the average sea temperature. Warmer water plays a higher note and colder
+- The main note follows the average temperature of the currents you can see on screen (not the whole
+  ocean, since only the moving streaks carry colour). Warmer water plays a higher note and colder
   water plays a lower note.
 - Up to four more notes come from the coldest, the warmest and the middle parts of the ocean in that
   frame. So a map with a big temperature range gives a wide chord, and an even map gives a narrow one.

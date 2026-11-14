@@ -18,7 +18,9 @@ Earth Jukebox turns EIC visualizations into sound (sonification). Three pillars:
 2. **Explorable by touch.** Move a finger, mouse or arrow keys over the map and hear the value at that spot; phones vibrate on hotspots.
 3. **Any visualization.** One engine plus one JSON config per dataset; a new EIC visualization becomes playable with no code changes.
 
-Modes: **Play** (sound follows the video), **Scan** (a line sweeps west → east, each column becomes a chord), **Explore** (touch / mouse / keys to hear one spot), and **Planet Symphony** (all four datasets layered).
+Modes: **Play** (sound follows the video), **Scan** (a line sweeps west → east, each column becomes a chord), **Explore** (touch / mouse / keys to hear one spot, with a proof panel showing pixel colour, colour bar position, value and note), and **Planet Symphony** (all four datasets layered; sound engine ready, not in the UI yet).
+
+Also: a **sonic legend** before playback, **eyes-closed mode** (E) with spoken summaries, **shareable links** (`?dataset=sst&t=30&mode=scan`), **Record track** (R), and **[Add your own visualization](add.html)**, which turns any video or image with a colour bar into a playable config. See `docs/mapping-notes.md` for plain notes on each.
 
 ## How it works
 
@@ -57,6 +59,8 @@ All visualizations are by the [NASA Scientific Visualization Studio (SVS)](https
 2. Open the folder in VS Code and install the recommended **Live Server** extension.
 3. Right-click `index.html` → **Open with Live Server**. (It must be served over http — opening the file directly with `file://` won't work.)
    No VS Code? Run `python -m http.server` in the folder and open http://localhost:8000.
+   (Python's simple server can't jump around inside videos, so scrubbing and shared links with a time
+   work best with Live Server.)
 4. Download the 720p MP4s from the SVS pages into `media/` (see `media/README.md`). Without them the app still plays sample sound so you can work on everything else.
 
 Optional colorbar tool: `pip install -r tools/requirements.txt`, then `python tools/sample_colorbar.py --help`.
