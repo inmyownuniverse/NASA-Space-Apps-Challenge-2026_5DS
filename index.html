@@ -1,0 +1,97 @@
+<!doctype html>
+<!-- Owner: Hazel · Support: Celene -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Earth Jukebox</title>
+  <meta name="description" content="Hear NASA Earth visualizations as music made from the real data in every frame.">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#player">Skip to player</a>
+
+  <header class="site-header">
+    <h1>Earth Jukebox</h1>
+    <p class="tagline">Pick a NASA Earth visualization and hear the real data in every frame.</p>
+  </header>
+
+  <main class="layout">
+    <!-- Jukebox list: one button per dataset, built by js/main.js from datasets/index.json -->
+    <nav class="panel jukebox" aria-labelledby="jukebox-heading">
+      <h2 id="jukebox-heading">Jukebox</h2>
+      <ul id="dataset-list" class="dataset-list">
+        <li class="loading">Loading datasets…</li>
+      </ul>
+    </nav>
+
+    <!-- Player: muted video (no native controls) + overlay canvas + custom controls -->
+    <section id="player" class="panel player" aria-labelledby="player-heading" tabindex="-1">
+      <h2 id="player-heading">Now playing: <span id="now-playing">nothing yet</span></h2>
+
+      <div class="stage">
+        <video id="video" muted playsinline preload="metadata" aria-hidden="true"></video>
+        <canvas id="overlay" class="overlay" width="1280" height="720"
+                role="img" aria-label="Visualization. Use Explore mode to hear values by position."></canvas>
+        <p id="player-message" class="player-message" role="status" hidden></p>
+      </div>
+
+      <div class="controls" role="group" aria-label="Player controls">
+        <button id="play-btn" type="button" aria-label="Play">Play</button>
+
+        <label for="scrub" class="visually-hidden">Position</label>
+        <input id="scrub" type="range" min="0" max="100" step="0.1" value="0"
+               aria-valuetext="0:00 of 0:00">
+        <span id="time" class="time" aria-hidden="true">0:00 / 0:00</span>
+
+        <div class="modes" role="group" aria-label="Mode">
+          <button type="button" class="mode-btn" data-mode="play" aria-pressed="true">Play</button>
+          <button type="button" class="mode-btn" data-mode="scan" aria-pressed="false">Scan</button>
+          <button type="button" class="mode-btn" data-mode="explore" aria-pressed="false">Explore</button>
+        </div>
+
+        <label for="volume">Volume</label>
+        <input id="volume" type="range" min="-40" max="0" step="1" value="-8" aria-valuetext="-8 decibels">
+      </div>
+    </section>
+
+    <!-- Info panel: description, legend, mapping explanation, live readout -->
+    <aside class="panel info" aria-labelledby="info-heading">
+      <h2 id="info-heading">About this dataset</h2>
+      <p id="description">Choose a dataset from the jukebox.</p>
+
+      <button id="legend-btn" type="button">Play legend</button>
+      <ul id="legend" class="legend"></ul>
+
+      <h3>How we mapped it</h3>
+      <p id="mapping">—</p>
+
+      <h3>Live readout</h3>
+      <p id="readout" class="readout">—</p>
+
+      <details class="shortcuts">
+        <summary>Keyboard shortcuts</summary>
+        <dl>
+          <dt>Space</dt><dd>Play / pause</dd>
+          <dt>← / →</dt><dd>Scrub 5 seconds</dd>
+          <dt>↑ / ↓</dt><dd>Volume</dd>
+          <dt>1–4</dt><dd>Pick dataset</dd>
+          <dt>M</dt><dd>Cycle mode (Play, Scan, Explore)</dd>
+          <dt>L</dt><dd>Play legend</dd>
+          <dt>D</dt><dd>Describe current frame</dd>
+          <dt>Esc</dt><dd>Stop sound</dd>
+        </dl>
+      </details>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <p>Visualizations: <a href="https://svs.gsfc.nasa.gov/">NASA Scientific Visualization Studio</a>.
+       Built for the NASA Space Apps Challenge 2026.</p>
+  </footer>
+
+  <!-- Screen-reader announcements (written by js/a11y.js) -->
+  <div id="live" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

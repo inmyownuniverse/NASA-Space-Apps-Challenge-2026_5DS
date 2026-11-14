@@ -1,0 +1,34 @@
+{
+  "id": "sst",
+  "title": "Sea Surface Currents and Temperature",
+  "source": "https://svs.gsfc.nasa.gov/3912/",
+  "video": "media/sst.mp4",
+  "dates": "TODO: copy from SVS page",
+  "description": "Ocean currents coloured by surface temperature. Warm water is red, cold is blue.",
+  "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+  "grid": { "w": 32, "h": 16 },
+  "colorbar": {
+    "unit": "°C",
+    "stops": [
+      { "rgb": [8, 29, 88], "value": 0 },
+      { "rgb": [178, 24, 43], "value": 30 }
+    ],
+    "maxDist": 60
+  },
+  "sound": {
+    "mapper": "continuousField",
+    "scale": "C major pentatonic",
+    "octaves": [3, 5],
+    "instrument": "warmPad",
+    "valueTo": "pitch",
+    "changeTo": "filter",
+    "maxVoices": 6,
+    "smoothFrames": 3,
+    "tensionAbove": 28
+  },
+  "legend": [
+    { "sound": "high notes", "means": "warm water" },
+    { "sound": "low notes", "means": "cold water" }
+  ],
+  "_todo": "Aahana: measure crop box and sample real colorbar stops. Freia: tune sound block."
+}

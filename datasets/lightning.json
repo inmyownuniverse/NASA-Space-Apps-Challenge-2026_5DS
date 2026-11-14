@@ -1,0 +1,34 @@
+{
+  "id": "lightning",
+  "title": "Lightning from the ISS",
+  "source": "https://svs.gsfc.nasa.gov/5011/",
+  "video": "media/lightning.mp4",
+  "dates": "TODO: copy from SVS page",
+  "description": "Lightning flashes seen from the International Space Station. Each bright flash is one strike.",
+  "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+  "grid": { "w": 32, "h": 16 },
+  "colorbar": {
+    "unit": "flash brightness",
+    "stops": [
+      { "rgb": [0, 0, 0], "value": 0 },
+      { "rgb": [255, 255, 255], "value": 1 }
+    ],
+    "maxDist": 60
+  },
+  "sound": {
+    "mapper": "events",
+    "scale": "C major pentatonic",
+    "octaves": [2, 4],
+    "instrument": "drum",
+    "valueTo": "rhythm",
+    "changeTo": "volume",
+    "maxVoices": 4,
+    "smoothFrames": 1,
+    "tensionAbove": 0.8
+  },
+  "legend": [
+    { "sound": "a drum hit", "means": "a lightning flash" },
+    { "sound": "left or right", "means": "where on Earth the flash is, west or east" }
+  ],
+  "_todo": "Aahana: measure crop box, decide flash detection threshold (is there a colorbar at all?). Freia: tune sound block. Celene: check description wording."
+}

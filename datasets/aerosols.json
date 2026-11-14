@@ -1,0 +1,42 @@
+{
+  "id": "aerosols",
+  "title": "GEOS Aerosols",
+  "source": "https://svs.gsfc.nasa.gov/5669/",
+  "video": "media/aerosols.mp4",
+  "dates": "TODO: copy from SVS page",
+  "description": "Tiny particles in the air from a NASA GEOS model: dust, smoke, sea salt and sulfate, each shown in its own colour.",
+  "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+  "grid": { "w": 32, "h": 16 },
+  "colorbar": {
+    "unit": "aerosol optical depth",
+    "stops": [
+      { "rgb": [0, 0, 0], "value": 0 },
+      { "rgb": [255, 255, 255], "value": 1 }
+    ],
+    "maxDist": 60,
+    "layers": {
+      "dust": { "rgb": [210, 170, 90] },
+      "smoke": { "rgb": [120, 120, 120] },
+      "salt": { "rgb": [70, 140, 230] },
+      "sulfate": { "rgb": [230, 230, 230] }
+    }
+  },
+  "sound": {
+    "mapper": "layers",
+    "scale": "C major pentatonic",
+    "octaves": [3, 5],
+    "instruments": ["dust", "smoke", "salt", "sulfate"],
+    "valueTo": "layer volume",
+    "changeTo": "filter",
+    "maxVoices": 8,
+    "smoothFrames": 3,
+    "tensionAbove": 0.7
+  },
+  "legend": [
+    { "sound": "a buzzing tone", "means": "dust" },
+    { "sound": "a rough tone", "means": "smoke" },
+    { "sound": "a clear tone", "means": "sea salt" },
+    { "sound": "a soft wobbling tone", "means": "sulfate" }
+  ],
+  "_todo": "Aahana: measure crop box and sample the real colour of each aerosol layer (the layer rgb values are guesses). Freia: tune sound block and one instrument per layer."
+}

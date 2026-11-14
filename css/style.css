@@ -1,0 +1,150 @@
+/* Owner: Hazel · Support: Celene */
+/* Dark NASA-style theme. All text colours checked for >= 4.5:1 contrast on their backgrounds. */
+
+:root {
+  --bg: #0b0d17;          /* deep space */
+  --panel: #151a2d;
+  --panel-border: #2a3355;
+  --text: #e8ecf5;        /* ~15:1 on --bg */
+  --muted: #aab3cc;       /* ~8:1 on --bg */
+  --accent: #4da3ff;      /* NASA-ish blue, ~7:1 on --bg */
+  --accent-strong: #fc3d21; /* NASA red, used for non-text accents only */
+  --focus: #ffd23f;       /* high-contrast focus ring */
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+a { color: var(--accent); }
+
+/* 3px high-contrast focus outline on everything focusable */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem; top: -3rem;
+  background: var(--focus);
+  color: #000;
+  padding: 0.5rem 1rem;
+  z-index: 10;
+}
+.skip-link:focus { top: 1rem; }
+
+.site-header, .site-footer { padding: 1rem 1.5rem; }
+.site-header h1 { margin: 0; font-size: 1.75rem; letter-spacing: 0.02em; }
+.site-header h1::before { content: "● "; color: var(--accent-strong); }
+.tagline, .site-footer { color: var(--muted); margin: 0.25rem 0 0; }
+
+/* Three regions: jukebox list | player | info panel */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr) minmax(220px, 1.2fr);
+  gap: 1rem;
+  padding: 0 1.5rem 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; padding: 0 1rem 1rem; }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  min-width: 0;
+}
+.panel h2 { margin-top: 0; font-size: 1.15rem; }
+.panel h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: #222a45;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+button:hover { background: #2c3660; }
+button[aria-pressed="true"], button[aria-current="true"] {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+/* Jukebox list */
+.dataset-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.dataset-list button { width: 100%; text-align: left; }
+.dataset-list .key { color: var(--muted); font-size: 0.85em; margin-right: 0.4rem; }
+.dataset-list button[aria-current="true"] .key { color: #000; }
+
+/* Player */
+.stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.stage video, .stage canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+.overlay { touch-action: none; } /* lets Explore mode use touch without scrolling */
+
+.player-message {
+  position: absolute; inset: 0;
+  margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+  background: rgba(11, 13, 23, 0.85);
+  color: var(--text);
+}
+.player-message[hidden] { display: none; }
+
+.controls {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+#scrub { flex: 1 1 200px; accent-color: var(--accent); }
+#volume { width: 110px; accent-color: var(--accent); }
+.time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.modes { display: flex; gap: 0.3rem; }
+
+/* Info panel */
+.legend { padding-left: 1.2rem; }
+.readout { font-variant-numeric: tabular-nums; color: var(--muted); }
+.shortcuts { margin-top: 1rem; }
+.shortcuts dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.8rem; }
+.shortcuts dt { font-weight: 600; }
+.shortcuts dd { margin: 0; color: var(--muted); }
+
+/* Respect reduced motion: hide the moving scan line */
+@media (prefers-reduced-motion: reduce) {
+  .overlay.scanning { visibility: hidden; }
+}
