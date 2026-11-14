@@ -162,3 +162,7 @@ Short plain notes on what each feature does and why it matters. One line per fea
   panel shows the exact pixel colour, where it sits on the colour bar, the real value it stands for
   (for example 28.9 °C) and the note it became. It is the one-glance proof that the music comes from
   the data, not from how pretty the colours are. Screen readers hear the same thing as a short sentence.
+- **Shareable links.** The address always matches what you are hearing, for example
+  `index.html?dataset=sst&t=30&mode=scan`. The "Copy link" button copies a link to this exact moment,
+  so anyone (a judge, a teacher, another website) opens the same dataset, time and mode. Browsers only
+  allow sound after a click, so the link waits for one click or key press before it starts.

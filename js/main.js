@@ -18,9 +18,17 @@ const legendHeard = new Set(); // dataset ids whose legend was heard (for "legen
 const $ = (id) => document.getElementById(id);
 
 // ---- audio unlock: browsers only allow sound after a user gesture ----
+let pendingMode = null; // mode from a shared link, applied on the first click or key press
+
+/** @returns {Promise<boolean>} true if this call switched to a mode from a shared link */
 async function ensureAudio() {
   await initAudio();
   setVolume(Number($('volume').value));
+  if (!pendingMode) return false;
+  const m = pendingMode;
+  pendingMode = null;
+  await setMode(m);
+  return true;
 }
 window.addEventListener('pointerdown', ensureAudio, { once: true });
 window.addEventListener('keydown', ensureAudio, { once: true });
@@ -30,6 +38,7 @@ async function loadDatasets() {
   const files = await (await fetch('datasets/index.json')).json();
   datasets = await Promise.all(files.map(async (f) => (await fetch(`datasets/${f}`)).json()));
   buildList();
+  applyUrl();
 }
 
 function buildList() {
@@ -67,6 +76,7 @@ function selectDataset(i) {
   loadDataset(cfg); // before player.load, so Scan mode can start on the new dataset
   player.load(cfg);
   updatePlayButton();
+  updateUrl();
   announce(`${cfg.title} selected. Press Space to play, or L to hear the legend.`);
 }
 
@@ -81,10 +91,11 @@ function mappingText(cfg) {
 // ---- controls ----
 async function togglePlay() {
   if (!current) { announce('Choose a dataset first.'); return; }
-  await ensureAudio();
+  if (await ensureAudio()) return; // the first key press started the shared link's mode
   if (player.isPlaying()) {
     player.pause();
     announce('Paused');
+    updateUrl();
   } else {
     if (mode === 'scan') await setMode('play'); // Play leaves Scan mode and plays the video again
     if ($('legend-first').checked && !legendHeard.has(current.id)) {
@@ -110,11 +121,67 @@ async function setMode(m) {
   document.querySelectorAll('.mode-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
   player.setMode(m);
   announce(`${m[0].toUpperCase()}${m.slice(1)} mode`);
+  updateUrl();
+}
+
+// ---- shareable links: ?dataset=sst&t=30&mode=scan ----
+let urlLocked = false; // true while a shared link is being applied
+
+function updateUrl() {
+  if (!current || urlLocked) return;
+  const p = new URLSearchParams({ dataset: current.id });
+  const t = Math.floor(player.currentTime());
+  if (t > 0) p.set('t', t);
+  const m = pendingMode ?? mode;
+  if (m !== 'play') p.set('mode', m);
+  history.replaceState(null, '', `${location.pathname}?${p}`);
+}
+
+async function copyLink() {
+  updateUrl();
+  try {
+    await navigator.clipboard.writeText(location.href);
+    announce('Link to this moment copied.');
+  } catch {
+    announce(`Copy this link: ${location.href}`);
+  }
+}
+
+/** Open the dataset, time and mode named in the address, if any. */
+function applyUrl() {
+  const p = new URLSearchParams(location.search);
+  const id = p.get('dataset');
+  if (!id) return;
+  const i = datasets.findIndex((d) => d.id === id || String(datasets.indexOf(d) + 1) === id);
+  if (i < 0) { announce(`No dataset called ${id}.`); return; }
+  urlLocked = true;
+  selectDataset(i);
+  const t = Number(p.get('t'));
+  if (!(t > 0)) urlLocked = false;
+  if (t > 0) {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      player.seek(t);
+      updateTime();
+      urlLocked = false;
+    };
+    $('video').addEventListener('loadedmetadata', go, { once: true });
+    setTimeout(go, 1500); // video missing: the simulated clock can seek straight away
+  }
+  const m = p.get('mode');
+  if (MODES.includes(m) && m !== 'play') {
+    pendingMode = m;
+    document.querySelectorAll('.mode-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    announce(`${current.title} opened from a link in ${m} mode. Press any key or click to start.`);
+  }
 }
 
 function scrubBy(dt) {
   player.seek(player.currentTime() + dt);
   updateTime();
+  updateUrl();
 }
 
 function changeVolume(delta) {
@@ -191,6 +258,7 @@ function wireControls() {
   $('scrub').addEventListener('input', (e) => { player.seek(Number(e.target.value)); updateTime(); });
   $('volume').addEventListener('input', onVolume);
   $('legend-btn').addEventListener('click', playLegend);
+  $('share-btn').addEventListener('click', copyLink);
   $('video').addEventListener('timeupdate', updateTime);
   $('video').addEventListener('loadedmetadata', updateTime);
   setInterval(() => { if (player.isPlaying()) updateTime(); }, 500); // also covers the no-video clock
