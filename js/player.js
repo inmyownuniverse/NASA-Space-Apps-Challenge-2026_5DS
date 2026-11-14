@@ -2,13 +2,12 @@
 // Player: drives the video and the per-frame loop analyse → sound → description.
 
 import { analyze, resetAnalyzer } from './analyzer.js';
-import { playFrame, releaseAll } from './sound/engine.js';
+import { playFrame, releaseAll, startScan, stopScan } from './sound/engine.js';
 import { demoFeatures } from './sound/demo.js';
 import { describe, announce } from './a11y.js';
 import { enableExplore } from './explore.js';
 
 const STEP = 0.25;      // analyse every 0.25 s of media time
-const SCAN_SECONDS = 8; // one west → east sweep in Scan mode
 
 let video, canvas, ctx, message;
 let cfg = null;
@@ -19,6 +18,7 @@ let lastT = -Infinity;
 let simStart = 0, simOffset = 0;
 let rafId = null, vfcId = null;
 let disableExplore = null;
+let latest = null;         // features of the last analysed frame (Scan, Explore, summaries)
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -76,9 +76,13 @@ export async function play() {
   loop();
 }
 
+/** Features of the most recent analysed frame, or null before the first frame. */
+export function latestFeatures() { return latest; }
+
 /** Pause playback and silence all notes. */
 export function pause() {
   if (!video) return;
+  stopScanning();
   if (playing && missing) simOffset = currentTime();
   playing = false;
   video.pause();
@@ -116,9 +120,65 @@ export function setMode(m) {
   mode = m;
   disableExplore?.();
   disableExplore = null;
+  stopScanning();
   canvas.classList.toggle('scanning', m === 'scan');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (m === 'explore' && cfg) disableExplore = enableExplore(canvas, cfg);
+  if (m === 'scan' && cfg) startScanning();
+}
+
+/** Analyse the frame on screen right now (or sample data when there is no video). */
+function analyseNow(t) {
+  latest = missing ? demoFeatures(cfg, t) : analyze(video, cfg);
+  return latest;
+}
+
+// ---- Scan mode: pause on the current frame and sweep it west to east, one column per beat ----
+let scanning = false;
+
+function startScanning() {
+  if (playing) pause();
+  if (!missing && video.readyState < 2) {
+    // Frame not decoded yet (dataset just loaded): start once it is, or once we know it's missing.
+    const retry = () => { if (mode === 'scan' && !scanning) startScanning(); };
+    video.addEventListener('loadeddata', retry, { once: true });
+    video.addEventListener('error', retry, { once: true });
+    return;
+  }
+  const t = currentTime();
+  const frame = analyseNow(t);
+  describe(frame, cfg, t);
+  scanning = true;
+  startScan(cfg, () => frame, (col, notes) => {
+    drawScanColumn(col);
+    const text = `Column ${col + 1} of ${cfg.grid.w}, west to east: ${notes.join(' ') || 'no data'}`;
+    const readout = document.getElementById('readout');
+    if (readout) readout.textContent = text;
+  });
+  announce('Scan mode: sweeping this frame from west to east. Press Space to go back to playing.');
+}
+
+function stopScanning() {
+  if (!scanning) return;
+  scanning = false;
+  stopScan();
+  releaseAll();
+  ctx?.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+export function isScanning() { return scanning; }
+
+function drawScanColumn(col) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (reducedMotion.matches) return;
+  const crop = cfg.crop ?? { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  const sx = canvas.width / (video.videoWidth || canvas.width);
+  const sy = canvas.height / (video.videoHeight || canvas.height);
+  const w = (crop.w / cfg.grid.w) * sx;
+  ctx.fillStyle = 'rgba(255, 210, 63, 0.35)';
+  ctx.fillRect(crop.x * sx + col * w, crop.y * sy, w, crop.h * sy);
+  ctx.fillStyle = 'rgba(255, 210, 63, 0.9)';
+  ctx.fillRect(crop.x * sx + col * w + w / 2 - 1.5, crop.y * sy, 3, crop.h * sy);
 }
 
 function loop() {
@@ -132,21 +192,11 @@ function loop() {
 }
 
 function tick(t) {
-  if (mode === 'scan') drawScanLine(t);
   if (t - lastT < STEP && t >= lastT) return;
   lastT = t;
 
-  // No video file yet: use sample data shaped for this dataset, so it can still be heard.
-  const features = missing ? demoFeatures(cfg, t) : analyze(video, cfg);
+  // No video file yet: analyseNow uses sample data shaped for this dataset, so it can still be heard.
+  const features = analyseNow(t);
   playFrame(features, cfg, t);
   describe(features, cfg, t);
-  // TODO(Freia): in Scan mode, play features.columns[scanColumn] as a chord instead.
-}
-
-function drawScanLine(t) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (reducedMotion.matches) return;
-  const x = ((t % SCAN_SECONDS) / SCAN_SECONDS) * canvas.width;
-  ctx.fillStyle = 'rgba(255, 210, 63, 0.9)';
-  ctx.fillRect(x - 1.5, 0, 3, canvas.height);
 }

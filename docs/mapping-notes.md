@@ -145,3 +145,11 @@ small clear bells. Using one shared chord means you can hear all four at once wi
 - When a particle appears or disappears: its instrument fading in or out.
 - For example, a big dust storm makes the low drone take over, and wildfire season brings in
   more crackle.
+
+## App features (notes for the story)
+
+Short plain notes on what each feature does and why it matters. One line per feature.
+
+- **Scan mode.** Press Scan and the video pauses. A bar sweeps the frozen map from west to east, and
+  each column plays as a short chord: low notes for the south, high notes for the north. It turns one
+  moment of the map into a little melody you can follow with your ears.

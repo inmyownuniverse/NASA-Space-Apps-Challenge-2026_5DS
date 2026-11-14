@@ -62,8 +62,8 @@ function selectDataset(i) {
   $('mapping').textContent = mappingText(cfg);
   $('readout').textContent = '—';
 
+  loadDataset(cfg); // before player.load, so Scan mode can start on the new dataset
   player.load(cfg);
-  loadDataset(cfg);
   updatePlayButton();
   announce(`${cfg.title} selected. Press Space to play.`);
 }
@@ -84,6 +84,7 @@ async function togglePlay() {
     player.pause();
     announce('Paused');
   } else {
+    if (mode === 'scan') await setMode('play'); // Play leaves Scan mode and plays the video again
     await player.play();
   }
   updatePlayButton();
@@ -96,7 +97,8 @@ function updatePlayButton() {
   btn.setAttribute('aria-label', label);
 }
 
-function setMode(m) {
+async function setMode(m) {
+  await ensureAudio(); // Scan mode makes sound straight away
   mode = m;
   document.querySelectorAll('.mode-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
   player.setMode(m);
