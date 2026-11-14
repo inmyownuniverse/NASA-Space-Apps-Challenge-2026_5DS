@@ -5,6 +5,7 @@ import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample } from 
 import * as player from './player.js';
 import { announce, speak, speakAndWait, formatTime } from './a11y.js';
 import { setEyesClosed } from './eyes.js';
+import { startRecording, stopRecording, isRecording } from './sound/export.js';
 
 const MODES = ['play', 'scan', 'explore'];
 const SCRUB_STEP = 5;   // seconds for ←/→
@@ -179,6 +180,23 @@ function applyUrl() {
   }
 }
 
+async function toggleRecord() {
+  if (!current) { announce('Choose a dataset first.'); return; }
+  await ensureAudio();
+  const btn = $('record-btn');
+  if (isRecording()) {
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = 'Record track';
+    await stopRecording(`${current.id}-earth-jukebox`);
+    announce('Recording stopped. Your track is downloading.');
+  } else {
+    await startRecording();
+    btn.setAttribute('aria-pressed', 'true');
+    btn.textContent = 'Stop and download';
+    announce('Recording. Press R or the button again to stop and download the track.');
+  }
+}
+
 let eyesClosed = false;
 function toggleEyes() {
   eyesClosed = !eyesClosed;
@@ -277,6 +295,7 @@ function wireControls() {
   $('legend-btn').addEventListener('click', playLegend);
   $('share-btn').addEventListener('click', copyLink);
   $('eyes-btn').addEventListener('click', toggleEyes);
+  $('record-btn').addEventListener('click', toggleRecord);
   $('video').addEventListener('timeupdate', updateTime);
   $('video').addEventListener('loadedmetadata', updateTime);
   setInterval(() => { if (player.isPlaying()) updateTime(); }, 500); // also covers the no-video clock
@@ -303,6 +322,7 @@ function onKey(e) {
     case 'l': case 'L': playLegend(); break;
     case 'd': case 'D': describeNow(); break;
     case 'e': case 'E': toggleEyes(); break;
+    case 'r': case 'R': toggleRecord(); break;
     case 'Escape': stopAll(); break;
     default: return;
   }
