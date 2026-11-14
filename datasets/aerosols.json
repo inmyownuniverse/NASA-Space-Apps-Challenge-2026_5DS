@@ -24,19 +24,22 @@
   "sound": {
     "mapper": "layers",
     "scale": "C major pentatonic",
-    "octaves": [3, 5],
     "instruments": ["dust", "smoke", "salt", "sulfate"],
     "valueTo": "layer volume",
     "changeTo": "filter",
-    "maxVoices": 8,
-    "smoothFrames": 3,
-    "tensionAbove": 0.7
+    "legendExamples": [
+      { "layer": "dust" },
+      { "layer": "smoke" },
+      { "layer": "salt" },
+      { "layer": "sulfate" }
+    ]
   },
   "legend": [
-    { "sound": "a buzzing tone", "means": "dust" },
-    { "sound": "a rough tone", "means": "smoke" },
-    { "sound": "a clear tone", "means": "sea salt" },
-    { "sound": "a soft wobbling tone", "means": "sulfate" }
+    { "sound": "a low, cello-like drone", "means": "dust" },
+    { "sound": "a crackle", "means": "smoke" },
+    { "sound": "an airy shimmer", "means": "sea salt" },
+    { "sound": "soft bells", "means": "sulfate" }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Aahana: measure crop box and sample the real colour of each aerosol layer (the layer rgb values are guesses). Freia: tune sound block and one instrument per layer."
 }

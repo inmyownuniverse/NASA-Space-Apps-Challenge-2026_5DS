@@ -21,6 +21,7 @@
       <a href="#scan">Scan</a>
       <a href="#explore">Explore</a>
       <a href="#symphony">Planet Symphony</a>
+      <a href="add.html">Add visualization</a>
     </nav>
     <button id="menu-toggle" aria-controls="site-navigation" aria-expanded="false" aria-label="Toggle navigation">☰</button>
   </header>
@@ -109,12 +110,24 @@
           <h3 id="dataset-title">Earth visualization</h3>
         </div>
         <div id="stage" class="stage">
-          <div id="media" class="media"></div>
-          <div id="scan-line" class="scan-line" hidden></div>
-          <div id="cursor" class="cursor" hidden></div>
+          <video id="video" muted playsinline preload="metadata" aria-hidden="true"></video>
+          <canvas id="overlay" class="overlay" width="1280" height="720" aria-label="Explore visualization"></canvas>
+          <p id="player-message" class="player-message" role="status" hidden></p>
+          <p class="eyes-message" aria-hidden="true">Eyes-closed mode. Press E to show the map.</p>
         </div>
         <p id="instruction" class="instruction"></p>
-        <div id="player-controls" class="controls"></div>
+        <div id="player-controls" class="controls" role="group" aria-label="Dataset playback">
+          <div class="transport"><button id="play-btn" class="primary" type="button">Play</button>
+            <label class="timeline">Timeline <input id="scrub" type="range" min="0" max="100" step="0.1" value="0"></label>
+            <output id="time"></output>
+          </div>
+          <div class="volume"><button id="mute-btn" type="button" aria-pressed="false">Mute</button>
+            <label>Volume <input id="volume" type="range" min="-40" max="0" value="-8"></label>
+          </div>
+          <button id="share-btn" type="button">Copy link</button>
+          <button id="eyes-btn" type="button" aria-pressed="false">Eyes closed</button>
+          <button id="record-btn" type="button" aria-pressed="false">Record track</button>
+        </div>
         <div class="modes" role="group" aria-label="Exploration mode">
           <button data-mode="play" aria-pressed="true">Play</button>
           <button data-mode="scan" aria-pressed="false">Scan</button>
@@ -123,11 +136,11 @@
       </section>
       <aside class="details" aria-label="Dataset information">
         <section class="panel info"><h3>About this dataset</h3><p id="description"></p></section>
-        <section id="readout" class="panel info readout" aria-label="Dataset readout"></section>
+        <section id="readout" class="panel info readout" aria-label="Dataset readout"><h3 id="readout-heading">Live readout</h3><div id="readout-value"></div></section>
         <section class="panel info">
           <h3>Sonic legend</h3><ul id="legend"></ul>
           <button id="legend-button">▷ Play legend</button>
-          <p id="legend-preview" hidden></p>
+          <label class="legend-first"><input id="legend-first" type="checkbox" checked> Hear the legend before playback</label>
         </section>
         <section class="panel info">
           <h3>How we mapped it</h3><p id="mapping"></p>
@@ -149,6 +162,6 @@
     </div>
     <div id="play-dialog-content"></div>
   </dialog>
-  <div id="status" role="status" class="sr-only"></div>
+  <div id="live" role="status" class="sr-only"></div>
 </body>
 </html>

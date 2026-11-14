@@ -1,67 +1,30 @@
 import { initLanding } from './landing.js';
-import { formatTime } from './a11y.js';
+import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample } from './sound/engine.js';
+import * as player from './player.js';
+import { announce, speak, speakAndWait, formatTime } from './a11y.js';
+import { setEyesClosed } from './eyes.js';
+import { startRecording, stopRecording, isRecording } from './sound/export.js';
 import { fixtures, modeCopy } from './presentation.js';
 
 const byId = (id) => document.getElementById(id);
-const stage = byId('stage');
-const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const clock = () => ({ elapsed: 0, running: false, duration: 0 });
-const player = clock();
-const symphony = clock();
-const state = { view: 'home', mode: 'play', volume: 75, muted: false, cell: null };
+const symphony = { elapsed: 0, running: false, duration: 0 };
+const state = { view: 'home', mode: 'play', volume: 75, muted: false };
 let datasets = [];
 let dataset;
-let mediaState = 'loading';
+let legendRun = 0;
+const legendHeard = new Set();
+let muted = false;
 
-function announce(message) {
-  byId('status').textContent = message;
+async function ensureAudio() {
+  await initAudio();
+  onVolume();
 }
 
-function mediaSurface(container, data, video = false) {
-  container.replaceChildren();
-  const message = document.createElement('span');
-  message.className = 'media-state';
-  const show = (status) => {
-    container.dataset.state = status;
-    message.textContent = status === 'loading' ? 'Loading visualization…'
-      : status === 'missing' ? (video ? 'Video not found' : 'Preview unavailable') : 'NASA preview';
-    if (video) mediaState = status;
-  };
-  show('loading');
+function mediaSurface(container, data) {
   const image = document.createElement('img');
   image.alt = data.title + ' visualization';
-  image.addEventListener('load', () => {
-    if (!video || !data.video) show(video ? 'missing' : 'ready');
-  });
-  image.addEventListener('error', () => {
-    image.hidden = true;
-    if (!video || !data.video) show('missing');
-  });
   if (data.preview) image.src = data.preview;
-  else {
-    image.hidden = true;
-    if (!video || !data.video) show('missing');
-  }
-  container.append(image, message);
-  if (!video || !data.video) return;
-  const clip = document.createElement('video');
-  clip.preload = 'metadata';
-  clip.muted = true;
-  clip.playsInline = true;
-  clip.hidden = true;
-  clip.addEventListener('loadedmetadata', () => {
-    if (clip.isConnected) {
-      if (state.mode === 'play' && Number.isFinite(clip.duration)) player.duration = clip.duration;
-      show('ready');
-      renderMode();
-      updateControls();
-    }
-  });
-  clip.addEventListener('error', () => {
-    if (clip.isConnected) show('missing');
-  });
-  container.prepend(clip);
-  clip.src = data.video;
+  container.replaceChildren(image);
 }
 
 function renderLibrary() {
@@ -82,8 +45,8 @@ function renderLibrary() {
 
 function selectDataset(data) {
   dataset = data;
-  Object.assign(player, clock(), { duration: state.mode === 'scan' ? 12 : data.duration });
-  state.cell = null;
+  legendRun++;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
   document.documentElement.style.setProperty('--accent', data.accent);
   document.querySelectorAll('[data-dataset]').forEach((button) => {
     button.setAttribute('aria-current', String(button.dataset.dataset === data.id));
@@ -98,8 +61,6 @@ function selectDataset(data) {
   byId('mapping').textContent = data.mapping;
   byId('source').hidden = !data.source;
   if (data.source) byId('source').href = data.source;
-  byId('legend-preview').hidden = true;
-  byId('legend-button').setAttribute('aria-expanded', 'false');
   byId('legend').replaceChildren(...data.legend.map(({ sound, means }) => {
     const item = document.createElement('li');
     const label = document.createElement('strong');
@@ -107,64 +68,14 @@ function selectDataset(data) {
     item.append(label, document.createTextNode(means));
     return item;
   }));
-  mediaSurface(byId('media'), data, true);
-  renderMode();
+  const video = byId('video');
+  video.poster = data.preview ?? '';
+  byId('readout-value').textContent = 'Ready';
+  loadDataset(data);
+  player.load(data);
+
+  updateTime();
   announce(data.title + ' selected');
-}
-
-function renderReadout() {
-  const explore = state.mode === 'explore';
-  const cell = state.cell;
-  const sample = explore ? dataset.cells?.[cell?.join(',')] : dataset.readout;
-  const available = sample?.value != null;
-  const card = byId('readout');
-  card.innerHTML = '<h3></h3><p class="eyebrow"></p><strong class="measurement"></strong><p class="measurement-detail"></p>';
-  card.querySelector('h3').textContent = explore ? 'Selected location' : 'Live readout';
-  card.querySelector('.eyebrow').textContent = 'Preview data';
-  const unit = sample?.unit ?? (explore ? dataset.colorbar?.unit : '');
-  card.querySelector('.measurement').textContent = available
-    ? [sample.value, unit].filter((part) => part !== '' && part != null).join(' ')
-    : explore && !cell ? 'Choose a cell' : 'Unavailable';
-  card.querySelector('.measurement-detail').textContent = explore && cell
-    ? [sample?.location ?? ('Column ' + (cell[0] + 1) + ' · Row ' + (cell[1] + 1)), sample?.hotspot ? 'Hotspot' : ''].filter(Boolean).join(' · ')
-    : sample?.timestamp ?? sample?.label ?? '';
-  if (!explore && sample?.timestamp && sample.label) {
-    card.querySelector('.measurement-detail').textContent = sample.label + ' · ' + sample.timestamp;
-  }
-}
-
-function renderMode() {
-  const explore = state.mode === 'explore';
-  const scan = state.mode === 'scan';
-  const clip = byId('media').querySelector('video');
-  const image = byId('media').querySelector('img');
-  if (clip && mediaState === 'ready') {
-    clip.hidden = state.mode !== 'play';
-    image.hidden = !clip.hidden || !image.getAttribute('src') || (image.complete && !image.naturalWidth);
-  }
-  stage.classList.toggle('exploring', explore);
-  if (explore) {
-    stage.tabIndex = 0;
-    stage.setAttribute('role', 'group');
-    stage.setAttribute('aria-label', 'Explore map');
-    stage.setAttribute('aria-describedby', 'instruction');
-  } else {
-    ['tabindex', 'role', 'aria-label', 'aria-describedby'].forEach((attribute) => stage.removeAttribute(attribute));
-  }
-  byId('instruction').textContent = modeCopy[state.mode];
-  byId('scan-line').hidden = !scan;
-  const cursor = byId('cursor');
-  cursor.hidden = !explore;
-  const [x, y] = state.cell ?? [16, 8];
-  cursor.style.left = (x + 0.5) / dataset.grid.w * 100 + '%';
-  cursor.style.top = (y + 0.5) / dataset.grid.h * 100 + '%';
-  cursor.classList.toggle('hotspot', Boolean(dataset.cells?.[state.cell?.join(',')]?.hotspot));
-  byId('player-controls').hidden = explore;
-  document.querySelectorAll('[data-mode]').forEach((button) => {
-    button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
-  });
-  renderReadout();
-  updateControls();
 }
 
 function buildControls(container, playback, name) {
@@ -197,58 +108,16 @@ function buildControls(container, playback, name) {
 }
 
 function updateControls() {
-  for (const [id, playback] of [['player-controls', player], ['symphony-controls', symphony]]) {
-    const container = byId(id);
-    const scan = playback === player && state.mode === 'scan';
-    const progress = playback.duration ? playback.elapsed / playback.duration : 0;
-    const complete = progress >= 1;
-    const percent = Math.round(progress * 100);
-    container.querySelector('[data-action="toggle"]').textContent = scan
-      ? playback.running ? 'Pause scan' : complete ? 'Scan again' : playback.elapsed ? 'Resume scan' : 'Start scan'
-      : playback.running ? 'Pause preview' : 'Play preview';
-    const timeline = container.querySelector('.timeline input');
-    timeline.max = playback.duration || 1;
-    timeline.value = playback.elapsed;
-    const time = formatTime(playback.elapsed) + ' / ' + formatTime(playback.duration);
-    timeline.setAttribute('aria-valuetext', scan ? percent + '%' : time);
-    container.querySelector('.timeline span').textContent = scan ? 'Scan progress' : 'Timeline';
-    container.querySelector('output').textContent = scan
-      ? (complete ? 'Complete' : playback.running ? 'Scanning' : playback.elapsed ? 'Paused' : 'Ready') + ' · ' + percent + '%'
-      : time;
-    const mute = container.querySelector('[data-action="mute"]');
-    mute.textContent = state.muted ? 'Unmute' : 'Mute';
-    container.querySelector('.volume input').value = state.volume;
-    if (scan) {
-      const position = reducedMotion.matches && playback.running ? 0 : Math.min(percent, 99.5);
-      byId('scan-line').style.left = position + '%';
-    }
-  }
-  const clip = byId('media').querySelector('video');
-  if (clip && mediaState === 'ready' && !clip.hidden && Math.abs(clip.currentTime - player.elapsed) > 0.45) {
-    clip.currentTime = player.elapsed;
-  }
+  const container = byId('symphony-controls');
+  container.querySelector('[data-action="toggle"]').textContent = symphony.running ? 'Pause preview' : 'Play preview';
+  const timeline = container.querySelector('.timeline input');
+  timeline.max = symphony.duration || 1;
+  timeline.value = symphony.elapsed;
+  container.querySelector('.timeline span').textContent = 'Timeline';
+  container.querySelector('output').textContent = formatTime(symphony.elapsed) + ' / ' + formatTime(symphony.duration);
+  container.querySelector('[data-action="mute"]').textContent = state.muted ? 'Unmute' : 'Mute';
+  container.querySelector('.volume input').value = state.volume;
 }
-
-function selectCell(x, y) {
-  state.cell = [Math.max(0, Math.min(dataset.grid.w - 1, x)), Math.max(0, Math.min(dataset.grid.h - 1, y))];
-  renderMode();
-  announce(byId('readout').textContent);
-}
-
-stage.addEventListener('click', (event) => {
-  if (state.mode !== 'explore') return;
-  const bounds = stage.getBoundingClientRect();
-  selectCell(Math.floor((event.clientX - bounds.left) / bounds.width * dataset.grid.w),
-    Math.floor((event.clientY - bounds.top) / bounds.height * dataset.grid.h));
-});
-
-stage.addEventListener('keydown', (event) => {
-  const offset = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
-  if (!offset || state.mode !== 'explore') return;
-  event.preventDefault();
-  const [x, y] = state.cell ?? [16, 8];
-  selectCell(x + offset[0], y + offset[1]);
-});
 
 const routes = ['home', 'play', 'scan', 'explore', 'symphony'];
 const landing = initLanding();
@@ -257,13 +126,16 @@ function navigate() {
   const requested = location.hash.slice(1);
   const route = routes.includes(requested) ? requested : 'home';
   state.view = route === 'home' || route === 'symphony' ? route : 'jukebox';
-  if (state.view === 'jukebox' && state.mode !== route) {
-    state.mode = route;
-    const clip = byId('media').querySelector('video');
-    const duration = Number.isFinite(clip?.duration) ? clip.duration : dataset?.duration;
-    Object.assign(player, clock(), { duration: route === 'scan' ? 12 : duration ?? 0 });
-  }
-  player.running = false;
+  if (state.view === 'jukebox') state.mode = route;
+  legendRun++;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  player.pause();
+  if (dataset) player.setMode(state.view === 'jukebox' && state.mode === 'explore' ? 'explore' : 'play');
+  document.querySelectorAll('[data-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
+  });
+  byId('instruction').textContent = modeCopy[state.mode];
+  byId('readout-heading').textContent = state.mode === 'explore' ? 'Selected location' : 'Live readout';
   symphony.running = false;
   byId('home').hidden = route !== 'home';
   byId('home-details').hidden = route !== 'home';
@@ -294,7 +166,7 @@ function navigate() {
     else link.removeAttribute('aria-current');
   });
   landing.setVisible(route === 'home');
-  if (dataset && state.view === 'jukebox') renderMode();
+  updateTime();
   updateControls();
 }
 
@@ -328,19 +200,194 @@ byId('dataset-notes').addEventListener('click', () => {
   showPlayDialog(dataset.title, dates, description, source);
 });
 
+async function toggleRecord() {
+  if (!dataset) { announce('Choose a dataset first.'); return; }
+  await ensureAudio();
+  const btn = byId('record-btn');
+  if (isRecording()) {
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = 'Record track';
+    await stopRecording(`${dataset.id}-earth-jukebox`);
+    announce('Recording stopped. Your track is downloading.');
+  } else {
+    await startRecording();
+    btn.setAttribute('aria-pressed', 'true');
+    btn.textContent = 'Stop and download';
+    announce('Recording. Press R or the button again to stop and download the track.');
+  }
+}
+
+let eyesClosed = false;
+function toggleEyes() {
+  eyesClosed = !eyesClosed;
+  byId('eyes-btn').setAttribute('aria-pressed', String(eyesClosed));
+  setEyesClosed(eyesClosed, {
+    getFeatures: player.latestFeatures,
+    getCfg: () => dataset,
+    isPlaying: player.isPlaying,
+  });
+  // Turning on, eyes.js speaks its own introduction and the first summary.
+  if (!eyesClosed) speak('Eyes-closed mode off.');
+  announce(eyesClosed ? 'Eyes-closed mode on. Summaries are spoken every 8 seconds. Press E to turn it off.' : 'Eyes-closed mode off.');
+}
+
+function scrubBy(dt) {
+  player.seek(player.currentTime() + dt);
+  updateTime();
+}
+
+function changeVolume(delta) {
+  const v = byId('volume');
+  v.value = Math.min(Number(v.max), Math.max(Number(v.min), Number(v.value) + delta));
+  onVolume();
+  announce(`Volume ${v.value} decibels`);
+}
+
+function onVolume() {
+  const v = byId('volume');
+  v.setAttribute('aria-valuetext', `${v.value} decibels`);
+  setVolume(muted ? -60 : Number(v.value));
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sonic legend: speak each legend line, then play its example sound.
+ * @returns {Promise<boolean>} true if it played to the end, false if it was stopped
+ */
+async function playLegend() {
+  if (!dataset) { announce('Choose a dataset first.'); return false; }
+  await ensureAudio();
+  if (player.isScanning()) player.setMode('play');
+  if (player.isPlaying()) { player.pause(); updateTime(); }
+  const run = ++legendRun;
+  const cfg = dataset;
+  const items = [...document.querySelectorAll('#legend li, #play-dialog-content li')];
+  const stopped = () => run !== legendRun || cfg !== dataset;
+
+  legendHeard.add(cfg.id); // heard or skipped: either way, don't force it again
+  await speakAndWait(`Legend for ${cfg.title}. Press Escape to skip.`);
+  for (let i = 0; i < cfg.legend.length; i++) {
+    if (stopped()) break;
+    items.forEach((li, k) => li.classList.toggle('speaking', k % cfg.legend.length === i));
+    await speakAndWait(`${cfg.legend[i].sound} means ${cfg.legend[i].means}.`);
+    if (stopped()) break;
+    playLegendSample(cfg, i);
+    await wait(2200);
+  }
+  items.forEach((li) => li.classList.remove('speaking'));
+  if (stopped()) return false;
+  releaseAll();
+  return true;
+}
+
+function describeNow() {
+  speak(byId('readout').textContent);
+}
+
+function stopAll() {
+  legendRun++; // cancels a legend that is playing
+  player.pause();
+  releaseAll();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  updateTime();
+  announce('Stopped');
+}
+
+function updateTime() {
+  const button = byId('play-btn');
+  button.textContent = player.isScanning() ? 'Stop scan' : state.mode === 'scan' ? 'Start scan' : player.isPlaying() ? 'Pause' : 'Play';
+  const t = player.currentTime();
+  const d = player.duration();
+  const scrub = byId('scrub');
+  scrub.max = d || 100;
+  scrub.value = t;
+  const text = `${formatTime(t)} of ${formatTime(d)}`;
+  scrub.setAttribute('aria-valuetext', text);
+  byId('time').textContent = `${formatTime(t)} / ${formatTime(d)}`;
+}
+
+
+async function togglePlay() {
+  if (!dataset) return;
+  await ensureAudio();
+  if (player.isScanning()) player.setMode('play');
+  else if (player.isPlaying()) player.pause();
+  else if (state.mode === 'scan') player.setMode('scan');
+  else {
+    const selected = dataset;
+    if (byId('legend-first').checked && !legendHeard.has(selected.id) && !await playLegend()) return;
+    if (dataset !== selected || state.view !== 'jukebox') return;
+    await player.play();
+  }
+  updateTime();
+}
+
+byId('play-btn').addEventListener('click', togglePlay);
+byId('scrub').addEventListener('input', (event) => { if (dataset) player.seek(Number(event.target.value)); updateTime(); });
+byId('volume').addEventListener('input', onVolume);
+byId('mute-btn').addEventListener('click', (event) => {
+  muted = !muted;
+  event.currentTarget.textContent = muted ? 'Unmute' : 'Mute';
+  event.currentTarget.setAttribute('aria-pressed', String(muted));
+  onVolume();
+});
+byId('share-btn').addEventListener('click', async () => {
+  if (!dataset) return;
+  const url = new URL(location.href);
+  url.search = new URLSearchParams({ dataset: dataset.id, t: Math.floor(player.currentTime()), mode: state.mode });
+  try { await navigator.clipboard.writeText(url.href); announce('Link copied.'); }
+  catch { announce(url.href); }
+});
+byId('eyes-btn').addEventListener('click', toggleEyes);
+byId('record-btn').addEventListener('click', toggleRecord);
+byId('video').addEventListener('loadedmetadata', updateTime);
+byId('video').addEventListener('timeupdate', updateTime);
+byId('video').addEventListener('ended', updateTime);
+playDialog.addEventListener('close', () => {
+  if (byId('play-dialog-title').textContent === 'Sonic legend') stopAll();
+});
 byId('legend-button').addEventListener('click', () => {
   if (!dataset) return;
-  if (state.view === 'jukebox' && state.mode === 'play') {
+  if (state.mode === 'play') {
     const legend = byId('legend').cloneNode(true);
     legend.removeAttribute('id');
     showPlayDialog('Sonic legend', legend);
-    return;
   }
-  const preview = byId('legend-preview');
-  preview.hidden = !preview.hidden;
-  preview.textContent = dataset.legend.map(({ sound, means }) => sound + ' means ' + means).join('. ') + '.';
-  byId('legend-button').setAttribute('aria-expanded', String(!preview.hidden));
+  playLegend();
 });
+
+const MODES = ['play', 'scan', 'explore'];
+const SCRUB_STEP = 5;
+const VOLUME_STEP = 2;
+function onKey(e) {
+  if (state.view !== 'jukebox' || !dataset || playDialog.open || e.defaultPrevented) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    if (e.key !== 'Escape') return; // let sliders use their own arrow keys
+  }
+
+  switch (e.key) {
+    case ' ':
+      if (tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'A') return; // Space activates the focused button
+      e.preventDefault(); togglePlay(); break;
+    case 'ArrowLeft': e.preventDefault(); scrubBy(-SCRUB_STEP); break;
+    case 'ArrowRight': e.preventDefault(); scrubBy(SCRUB_STEP); break;
+    case 'ArrowUp': e.preventDefault(); changeVolume(VOLUME_STEP); break;
+    case 'ArrowDown': e.preventDefault(); changeVolume(-VOLUME_STEP); break;
+    case '1': case '2': case '3': case '4': selectDataset(datasets[Number(e.key) - 1]); break;
+    case 'm': case 'M': location.hash = MODES[(MODES.indexOf(state.mode) + 1) % MODES.length]; break;
+    case 'l': case 'L': playLegend(); break;
+    case 'd': case 'D': describeNow(); break;
+    case 'e': case 'E': toggleEyes(); break;
+    case 'r': case 'R': toggleRecord(); break;
+    case 'Escape': stopAll(); break;
+    default: return;
+  }
+}
+
+document.addEventListener('keydown', onKey);
 
 function renderTiles() {
   byId('tiles').replaceChildren(...datasets.map((data) => {
@@ -356,18 +403,18 @@ function renderTiles() {
   }));
 }
 
-buildControls(byId('player-controls'), player, 'Dataset preview');
 buildControls(byId('symphony-controls'), symphony, 'Symphony preview');
 
 let lastTick = performance.now();
 setInterval(() => {
   const now = performance.now();
-  const playback = state.view === 'jukebox' ? player : symphony;
+  if (state.view === 'jukebox' && dataset) updateTime();
+  const playback = symphony;
   if (playback.running) {
     playback.elapsed = Math.min(playback.duration, playback.elapsed + (now - lastTick) / 1000);
     if (playback.elapsed >= playback.duration) {
       playback.running = false;
-      announce(state.view === 'jukebox' && state.mode === 'scan' ? 'Scan complete' : 'Preview complete');
+      announce('Preview complete');
     }
     updateControls();
   }
@@ -406,13 +453,30 @@ async function start() {
   const files = await json('datasets/index.json');
   datasets = await Promise.all(files.map(async (file) => {
     const config = await json('datasets/' + file);
-    return { ...config, ...fixtures[config.id] };
+    return { ...fixtures[config.id], ...config };
   }));
   symphony.duration = Math.max(...datasets.map(({ duration }) => duration));
   renderLibrary();
   renderShowcase();
   renderTiles();
-  selectDataset(datasets[0]);
+  const params = new URLSearchParams(location.search);
+  const id = params.get('dataset');
+  const requested = datasets.find((item, index) => item.id === id || String(index + 1) === id);
+  selectDataset(requested ?? datasets[0]);
+  if (requested) {
+    if (!location.hash) location.hash = MODES.includes(params.get('mode')) ? params.get('mode') : 'play';
+    const time = Number(params.get('t'));
+    if (time > 0) {
+      const abort = new AbortController();
+      const seek = () => {
+        abort.abort();
+        if (dataset === requested) { player.seek(time); updateTime(); }
+      };
+      for (const event of ['loadedmetadata', 'error']) {
+        byId('video').addEventListener(event, seek, { signal: abort.signal });
+      }
+    }
+  }
 }
 
 const playNotes = document.querySelectorAll('#jukebox .details > :not(:first-child)');

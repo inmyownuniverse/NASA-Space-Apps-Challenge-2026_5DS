@@ -656,3 +656,30 @@ button:hover { background: #21314a; }
     cursor: url("../media/rocket-action.svg") 3 2, pointer;
   }
 }
+
+/* Eyes-closed mode: hide the picture, keep everything else */
+.eyes-message { display: none; }
+/* The video keeps rendering underneath (hiding it would stop the frame loop and the music);
+   an opaque black cover sits on top instead. */
+.eyes-closed .eyes-message {
+  display: flex; position: absolute; inset: 0; z-index: 5; margin: 0; padding: 1.5rem;
+  background: #000;
+  align-items: center; justify-content: center; text-align: center; font-size: 1.4rem;
+}
+#eyes-btn[aria-pressed="true"] { outline: 2px solid var(--accent); }
+
+/* Explore mode proof panel (built by js/explore.js) */
+.probe { margin-top: 1rem; padding: 0.75rem; border: 1px solid var(--accent); border-radius: 6px; }
+.probe h3 { margin-top: 0; }
+.probe p { margin: 0.35rem 0; }
+.probe-row { display: flex; gap: 0.6rem; align-items: center; }
+.probe-swatch { width: 2rem; height: 2rem; border: 2px solid #fff; border-radius: 4px; flex: none; }
+.probe-bar { position: relative; height: 0.9rem; border-radius: 3px; margin-top: 0.6rem; }
+.probe-marker { position: absolute; top: -0.35rem; width: 4px; height: 1.6rem; margin-left: -2px; background: #fff; border: 1px solid #000; }
+.probe-bar-ends { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); }
+.probe-value, .probe-note { font-variant-numeric: tabular-nums; }
+
+.stage .overlay { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.player-message { position: absolute; inset: auto .65rem .65rem; z-index: 2; padding: .55rem .75rem; background: #090d15ee; border-radius: 6px; pointer-events: none; }
+.legend-first { display: block; margin-top: .65rem; font-size: .8rem; }
+#legend li.speaking, #play-dialog-content li.speaking { background: #ffffff12; }

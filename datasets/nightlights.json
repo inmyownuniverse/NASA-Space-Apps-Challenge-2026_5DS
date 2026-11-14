@@ -18,17 +18,18 @@
   "sound": {
     "mapper": "density",
     "scale": "C major pentatonic",
-    "octaves": [4, 6],
     "instrument": "glass",
     "valueTo": "note density",
     "changeTo": "sparkle",
-    "maxVoices": 8,
-    "smoothFrames": 2,
-    "tensionAbove": 80
+    "legendExamples": [
+      { "values": [40, 55, 70, 85, 60, 45] },
+      { "values": [20, 100] }
+    ]
   },
   "legend": [
     { "sound": "more sparkling notes", "means": "more lit-up area" },
     { "sound": "higher notes", "means": "brighter lights" }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Aahana: measure crop box, sample real colorbar stops and units from SVS page. Freia: tune sound block."
 }

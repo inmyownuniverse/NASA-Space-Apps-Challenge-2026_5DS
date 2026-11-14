@@ -17,18 +17,19 @@
   },
   "sound": {
     "mapper": "events",
-    "scale": "C major pentatonic",
-    "octaves": [2, 4],
+    "scale": "C minor pentatonic",
     "instrument": "drum",
     "valueTo": "rhythm",
-    "changeTo": "volume",
-    "maxVoices": 4,
-    "smoothFrames": 1,
-    "tensionAbove": 0.8
+    "changeTo": "none",
+    "legendExamples": [
+      { "flashes": [{ "x": 16, "y": 8, "value": 1 }] },
+      { "flashes": [{ "x": 0, "y": 8, "value": 1 }, { "x": 31, "y": 8, "value": 1 }] }
+    ]
   },
   "legend": [
     { "sound": "a drum hit", "means": "a lightning flash" },
     { "sound": "left or right", "means": "where on Earth the flash is, west or east" }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Aahana: measure crop box, decide flash detection threshold (is there a colorbar at all?). Freia: tune sound block. Celene: check description wording."
 }

@@ -3,6 +3,10 @@
 
 const DATA_THROTTLE_MS = 5000; // at most one data line per 5 s so screen readers aren't flooded
 let lastDataAnnounce = 0;
+let dataAnnouncements = true; // off in eyes-closed mode, which speaks its own summaries
+
+/** Turn the throttled data lines in the live region on or off. */
+export function setDataAnnouncements(on) { dataAnnouncements = on; }
 
 /**
  * Write text into the aria-live="polite" region (#live).
@@ -14,6 +18,7 @@ export function announce(text, { data = false } = {}) {
   if (!live || !text) return;
 
   if (data) {
+    if (!dataAnnouncements) return;
     const now = performance.now();
     if (now - lastDataAnnounce < DATA_THROTTLE_MS) return;
     lastDataAnnounce = now;
@@ -31,6 +36,24 @@ export function speak(text) {
   const u = new SpeechSynthesisUtterance(text);
   u.rate = 1.05;
   speechSynthesis.speak(u);
+}
+
+/**
+ * Speak text and wait until it has been said (or maxMs passed, or speech isn't available).
+ * @returns {Promise<void>}
+ */
+export function speakAndWait(text, maxMs = 6000) {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(done, 'speechSynthesis' in window ? maxMs : 1200);
+    if (!('speechSynthesis' in window) || !text) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05;
+    u.onend = done;
+    u.onerror = done;
+    speechSynthesis.speak(u);
+  });
 }
 
 /** Short vibration on phones that support it (no-op elsewhere). */
@@ -58,7 +81,7 @@ export function describe(features, cfg, t) {
   if (features.fake) text += ' (sample data)';
   // TODO(Celene): friendlier, dataset-specific wording (e.g. "the Gulf Stream is warming").
 
-  const readout = document.getElementById('readout');
+  const readout = document.getElementById('readout-value');
   if (readout) readout.textContent = text;
   announce(text, { data: true });
   return text;
