@@ -7,7 +7,7 @@ import { tuned } from './sound/tuning.js';
 import { initLanding } from './landing.js';
 import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample, playProbe, loadSymphony, playSymphonyFrame, setSymphonyLevel } from './sound/engine.js';
 import * as player from './player.js';
-import { announce, speak, speakAndWait, formatTime } from './a11y.js';
+import { announce, speak, formatTime } from './a11y.js';
 import { setEyesClosed } from './eyes.js';
 import { startRecording, stopRecording, isRecording } from './sound/export.js';
 import { fixtures, modeCopy } from './presentation.js';
@@ -24,6 +24,7 @@ function cancelLegend() {
   legendRun++;
   legendVoice?.abort();
   legendVoice = undefined;
+  showLegendTranscript(false);
   byId('legend-button').textContent = 'Play legend';
   document.querySelectorAll('#legend .speaking, #play-dialog-content .speaking').forEach(item => item.classList.remove('speaking'));
   byId('legend-voice-status').textContent = '';
@@ -314,7 +315,7 @@ async function toggleRecord() {
       const blob = await stopRecording(recordingName);
       announce(blob?.type === 'audio/wav' ? 'WAV recording saved.' : 'Recording saved in the browser capture format.');
     } else {
-      recordingName = state.view === 'symphony' ? 'planet-symphony' : dataset.id + '-earth-jukebox';
+      recordingName = state.view === 'symphony' ? 'planet-symphony' : dataset.id + '-terratone';
       await startRecording();
       announce('Recording started.');
     }
@@ -370,29 +371,70 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // after the first failure we stop asking for the rest of the visit.
 let narrationServer = null; // null = not tried, true = works, false = not available
 
-function playNarration(datasetId, language, line, signal) {
-  if (narrationServer === false) return Promise.reject(new Error('No narration server'));
-  const query = new URLSearchParams({ dataset: datasetId, language, line });
-  const audio = new Audio('api/legend-voice?' + query);
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      finish(false);
-    };
-    function finish(ok) {
-      signal.removeEventListener('abort', abort);
-      audio.onended = audio.onerror = null;
-      if (ok || signal.aborted) resolve();
-      else reject(new Error('Sarvam narration unavailable'));
-    }
-    if (signal.aborted) { abort(); return; }
-    signal.addEventListener('abort', abort, { once: true });
-    audio.onended = () => { narrationServer = true; finish(true); };
-    audio.onerror = () => { if (narrationServer === null) narrationServer = false; finish(false); };
-    audio.play().catch(() => finish(false));
-  });
+function showLegendTranscript(show, language) {
+  const transcript = byId('legend-transcript');
+  transcript.hidden = !show;
+  transcript.querySelector('ol').replaceChildren();
+  if (show) {
+    transcript.lang = language;
+    byId('legend-transcript-status').textContent = 'Loading Sarvam narration…';
+  }
+}
+
+async function playNarration(datasetId, language, line, signal) {
+  const query = new URLSearchParams({ dataset: datasetId, language, line, format: 'json' });
+  const response = await fetch('api/legend-voice?' + query, { signal });
+  const type = response.headers.get('content-type') ?? '';
+  if (!response.ok || !(type.startsWith('audio/') || type.includes('application/json'))) {
+    narrationServer = ![404, 405, 501].includes(response.status) && !type.includes('text/html');
+    throw new Error('Sarvam narration unavailable');
+  }
+  narrationServer = true;
+  let text, clip;
+  if (type.includes('application/json')) {
+    const payload = await response.json();
+    text = payload.text;
+    clip = new Blob([Uint8Array.from(atob(payload.audio), character => character.charCodeAt(0))], { type: 'audio/wav' });
+  } else {
+    const header = response.headers.get('x-legend-text');
+    text = header ? decodeURIComponent(header) : '';
+    clip = await response.blob();
+  }
+  const englishCaption = !text && language !== 'en-IN';
+  if (!text) {
+    const entry = dataset.legend[Number(line)];
+    text = entry ? entry.sound + ' means ' + entry.means + '.' : 'Sonic legend for ' + dataset.title + '.';
+  }
+  const url = URL.createObjectURL(clip);
+  const audio = new Audio(url);
+  let abort;
+  try {
+    await new Promise((resolve, reject) => {
+      abort = () => { audio.pause(); resolve(); };
+      if (signal.aborted) { resolve(); return; }
+      signal.addEventListener('abort', abort, { once: true });
+      audio.onplaying = () => {
+        if (signal.aborted || !text) return;
+        byId('legend-transcript-status').textContent = englishCaption ? 'English captions · translated narration' : '';
+        const list = byId('legend-transcript').querySelector('ol');
+        list.querySelector('[aria-current]')?.removeAttribute('aria-current');
+        const item = document.createElement('li');
+        item.textContent = text;
+        if (englishCaption) item.lang = 'en';
+        item.setAttribute('aria-current', 'true');
+        list.append(item);
+        list.scrollTop = list.scrollHeight;
+        audio.onplaying = null;
+      };
+      audio.onended = resolve;
+      audio.onerror = reject;
+      audio.play().catch(reject);
+    });
+  } finally {
+    signal.removeEventListener('abort', abort);
+    audio.onplaying = audio.onended = audio.onerror = null;
+    URL.revokeObjectURL(url);
+  }
 }
 
 byId('legend-language').addEventListener('change', () => {
@@ -425,26 +467,18 @@ async function playLegend() {
 
   const language = byId('legend-language').value;
   const status = byId('legend-voice-status');
+  showLegendTranscript(true, language);
   status.textContent = 'Loading legend narration…';
-  let browserFallback = false;
-  async function sayLine(line, text) {
-    if (browserFallback) return speakAndWait(text);
-    try {
-      await playNarration(cfg.id, language, line, signal);
-      if (!stopped()) status.textContent = '';
-    } catch (error) {
-      if (stopped()) return;
-      if (language !== 'en-IN') throw error;
-      browserFallback = true;
-      status.textContent = 'Using your browser’s English voice.';
-      await speakAndWait(text);
-    }
+  async function sayLine(line) {
+    byId('legend-transcript-status').textContent = 'Loading Sarvam narration…';
+    await playNarration(cfg.id, language, line, signal);
+    if (!stopped()) status.textContent = '';
   }
   try {
-    await sayLine('intro', 'Sonic legend for ' + cfg.title + '.');
+    await sayLine('intro');
     for (let i = 0; i < cfg.legend.length && !stopped(); i++) {
       items.forEach((li, k) => li.classList.toggle('speaking', k % cfg.legend.length === i));
-      await sayLine(i, cfg.legend[i].sound + ' means ' + cfg.legend[i].means + '.');
+      await sayLine(i);
       if (stopped()) break;
       playLegendSample(cfg, i);
       await wait(2200);
@@ -452,14 +486,16 @@ async function playLegend() {
   } catch {
     if (!stopped()) {
       status.textContent = narrationServer === false
-        ? 'Narration in this language works when you run the app locally with our server. Choose English to hear your browser’s voice.'
-        : 'Narration is unavailable in this language. Try again or choose English.';
+        ? 'Open Terratone through the Node server to use Sarvam narration.'
+        : 'Narration is unavailable in this language. Try again shortly.';
+      byId('legend-transcript-status').textContent = status.textContent;
       announce(status.textContent);
     }
     return false;
   } finally {
     if (!stopped()) {
       legendVoice = undefined;
+      byId('legend-transcript').querySelector('[aria-current]')?.removeAttribute('aria-current');
       byId('legend-button').textContent = 'Play legend';
       items.forEach(li => li.classList.remove('speaking'));
       releaseAll();

@@ -243,7 +243,7 @@ export function bindRocky() {
       input.focus({ preventScroll: true });
       return;
     }
-    teach('Explain this part of Earth Jukebox to a student: ' + text);
+    teach('Explain this part of Terratone to a student: ' + text);
     input.focus({ preventScroll: true });
   }, true);
 

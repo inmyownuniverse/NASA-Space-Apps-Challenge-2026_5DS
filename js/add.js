@@ -63,8 +63,44 @@ $('file').addEventListener('change', () => {
   }
 });
 
+const steps = [...document.querySelectorAll('#steps fieldset')];
+const progress = [...document.querySelectorAll('.add-progress li')];
+const stepTitles = ['Load an image or video', 'Select the map area', 'Set the colour bar', 'Choose a sound', 'Review and save'];
+let activeStep = 0;
+
+function showStep(index, focus = false) {
+  activeStep = index;
+  steps.forEach((step, i) => { step.hidden = i !== index; });
+  progress.forEach((item, i) => {
+    item.classList.toggle('complete', i < index);
+    if (i === index) item.setAttribute('aria-current', 'step');
+    else item.removeAttribute('aria-current');
+    item.firstElementChild.textContent = i < index ? '✓' : String(i + 1).padStart(2, '0');
+  });
+  $('steps-heading').textContent = stepTitles[index];
+  $('step-back').hidden = index === 0;
+  $('step-next').hidden = index === steps.length - 1;
+  if (focus) $('steps').focus();
+}
+
+$('step-back').addEventListener('click', () => showStep(activeStep - 1, true));
+$('step-next').addEventListener('click', () => {
+  if (!source) { fail(1, 'Choose an image or video, or try the example.'); return; }
+  if (activeStep === 1 && [num('cx'), num('cy'), num('cw'), num('ch')].some((value, i) => !Number.isFinite(value) || value < (i < 2 ? 0 : 1))) {
+    fail(2, 'Enter a valid map box.'); return;
+  }
+  if (activeStep === 2 && !stops.length) {
+    sampleBar();
+    if (!stops.length) return;
+  }
+  showStep(activeStep + 1, true);
+});
+showStep(0);
+
 function ready(src, img) {
   source = src;
+  $('preview-filename').textContent = fileName;
+  $('preview-filename').hidden = false;
   $('video').hidden = Boolean(img);
   if (img) {
     // Show the still image behind the overlay.
@@ -313,10 +349,9 @@ $('download').addEventListener('click', () => {
 });
 
 // ---------- one-click example: an SST frame with its colour bar ----------
-// The SST video has no colour bar in the frame, so the example draws the frame at 10 s with the
-// SST colour bar (tools/sst_colorbar.png) underneath, then fills in every step.
+// The bundled still combines the SST frame at 10 seconds and its calibrated colour bar.
 const EXAMPLE = {
-  video: 'media/sst.mp4', at: 10, bar: 'tools/sst_colorbar.png', barX: 485, barY: 650,
+  image: 'media/sst-example.png',
   size: [1280, 760], crop: [0, 0, 1280, 600], ends: [501, 678, 774, 678],
   vmin: 0, vmax: 32, unit: '°C', tolerance: 75,
   title: 'Sea Surface Temperature (example)', source: 'https://svs.gsfc.nasa.gov/3912/',
@@ -326,27 +361,16 @@ async function loadExample() {
   stop();
   say(0, 'Loading the example…');
   try {
-    const v = document.createElement('video');
-    v.muted = true;
-    v.preload = 'auto';
-    v.src = EXAMPLE.video;
-    await new Promise((resolve, reject) => { v.onloadeddata = resolve; v.onerror = reject; });
-    v.currentTime = EXAMPLE.at;
-    await new Promise((resolve) => { v.onseeked = resolve; });
-    const bar = new Image();
-    bar.src = EXAMPLE.bar;
-    await bar.decode();
+    const image = new Image();
+    image.src = EXAMPLE.image;
+    await image.decode();
     const c = document.createElement('canvas');
     [c.width, c.height] = EXAMPLE.size;
-    const x = c.getContext('2d');
-    x.fillStyle = '#000';
-    x.fillRect(0, 0, c.width, c.height);
-    x.drawImage(v, 0, 0);
-    x.drawImage(bar, EXAMPLE.barX, EXAMPLE.barY);
+    c.getContext('2d').drawImage(image, 0, 0);
     // The analyser expects a video; give the still image the same fields.
     Object.assign(c, { readyState: 4, videoWidth: c.width, videoHeight: c.height, currentTime: 0 });
     fileName = 'sst-example.mp4';
-    ready(c, { src: c.toDataURL('image/jpeg', 0.9) });
+    ready(c, image);
     const set = (id, val) => { $(id).value = val; };
     [['cx', 0], ['cy', 1], ['cw', 2], ['ch', 3]].forEach(([id, i]) => set(id, EXAMPLE.crop[i]));
     [['bx1', 0], ['by1', 1], ['bx2', 2], ['by2', 3]].forEach(([id, i]) => set(id, EXAMPLE.ends[i]));
@@ -356,10 +380,10 @@ async function loadExample() {
     say(1, 'Loaded an SST frame, with its colour bar added underneath.');
     say(2, 'Map area set: the map without the colour bar, 1280 by 600 pixels.');
     sampleBar();
-    say(0, 'Example ready. Every step is filled in: press Play in step 4 to hear it.');
-    $('play').focus();
+    say(0, 'Example ready. Adjust the map area or continue.');
+    showStep(1, true);
   } catch {
-    fail(0, 'The example could not load. Open this page through a web server (Live Server or the live site).');
+    fail(0, 'The bundled SST example image could not load. Refresh the page and try again.');
   }
 }
 $('example').addEventListener('click', loadExample);

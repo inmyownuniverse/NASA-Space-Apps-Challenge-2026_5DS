@@ -58,7 +58,7 @@ function encodeWav(audio) {
   return new Blob([view.buffer], { type: 'audio/wav' });
 }
 
-export async function stopRecording(name = 'earth-jukebox') {
+export async function stopRecording(name = 'terratone') {
   if (!recorder) return null;
   const r = recorder;
   recorder = null;

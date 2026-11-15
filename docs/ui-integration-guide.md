@@ -362,7 +362,7 @@ setEyesClosed(eyesClosed, {
 - **UI:** `#record-btn` (with `aria-pressed`, text switches to "Stop and download").
 - **Trigger:** the button or the R key, in `main.js` `toggleRecord()`.
 - **Order:** `ensureAudio()`, then `startRecording()` from `js/sound/export.js`; the second press calls
-  `stopRecording(`${id}-earth-jukebox`)`, which stops the recorder and triggers the download.
+  `stopRecording(`${id}-terratone`)`, which stops the recorder and triggers the download.
 
 ### Sample data when a video is missing
 

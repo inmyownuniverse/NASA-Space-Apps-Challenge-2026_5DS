@@ -1,5 +1,5 @@
 // Owner: Freia · Support: Jaden
-// Sound tuning: every number that changes how Earth Jukebox sounds lives in this file.
+// Sound tuning: every number that changes how Terratone sounds lives in this file.
 //
 // How to tune:
 //   1. Open tools/sound-lab.html, change values there and listen.

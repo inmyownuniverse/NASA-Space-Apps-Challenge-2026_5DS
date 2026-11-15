@@ -196,7 +196,7 @@ Short plain notes on what each feature does and why it matters. One line per fea
   says how many map cells match it, plays the result straight away with the same sound engine, and
   downloads the config file. Drop that file in `datasets/` and the new visualization is in the
   jukebox, with no code changes. The "Try with an example" button fills in every step with a Sea Surface
-  Temperature frame and its colour bar, so anyone can see it work in one click. This is the live proof that Earth Jukebox works for any EIC
+  Temperature frame and its colour bar, so anyone can see it work in one click. This is the live proof that Terratone works for any EIC
   visualization, not just our four.
 - **Record track.** Press R (or "Record track") while listening, then press it again. The music
   downloads as an audio file you can share, so a dataset's song can live outside the app, for

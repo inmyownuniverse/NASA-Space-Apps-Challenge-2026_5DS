@@ -1,4 +1,4 @@
-# Earth Jukebox
+# Terratone
 
 <!-- Owner: Celene · Support: Hazel -->
 
@@ -12,7 +12,7 @@ NASA's Earth Information Center (EIC) visualizations convey patterns through col
 
 ## Our solution
 
-Earth Jukebox turns EIC visualizations into sound (sonification). Three pillars:
+Terratone turns EIC visualizations into sound (sonification). Three pillars:
 
 1. **Data-faithful.** The sound comes from what the data in each frame shows, not from how pretty the colours are. For sea surface temperature we invert the colour bar to turn a pixel's colour back into the real value in °C, so pitch means real temperature, not just "redness". For night lights, lightning and aerosols we measure what the picture shows: how bright each area is, each new lightning strike, and which aerosol type each coloured pixel belongs to.
 2. **Explorable by touch.** Move a finger, mouse or arrow keys over the map and hear the value at that spot; phones vibrate on hotspots.

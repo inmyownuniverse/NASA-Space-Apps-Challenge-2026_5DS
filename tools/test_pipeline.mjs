@@ -1,4 +1,4 @@
-// Test suite for Earth Jukebox Data & Vision pipeline
+// Test suite for Terratone Data & Vision pipeline
 // Tests colorbar inversion, frame analysis feature contract, real asset integration, and compatibility.
 
 import fs from 'node:fs';

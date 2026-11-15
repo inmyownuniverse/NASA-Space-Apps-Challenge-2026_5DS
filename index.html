@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Earth Jukebox</title>
+  <title>Terratone</title>
   <meta name="description" content="Explore NASA Earth visualizations through sound.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&amp;display=swap">
-  <link rel="icon" type="image/svg+xml" href="media/rocket-cursor.svg">
+  <link rel="icon" type="image/png" href="media/logo.png">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/main.js"></script>
 </head>
 <body class="home-active">
   <a class="skip" href="#main">Skip to content</a>
   <header class="shell header">
-    <a class="brand" href="#home"><span class="brand-icon" aria-hidden="true"></span><span>EARTH<br>JUKEBOX</span></a>
+    <a class="brand" href="#home"><img class="brand-icon" src="media/logo.png" alt="" width="40" height="40"><span>TERRATONE</span></a>
     <nav id="site-navigation" aria-label="Studio views">
       <a href="#home" aria-current="page">Home</a>
       <a href="#play">Play</a>
@@ -38,13 +38,13 @@
     <p class="hero-kicker">NASA EARTH OBSERVATIONS</p>
     <div class="hero-heading">
       <button class="orbit-arrow" id="previous-feature" aria-label="Previous feature">‹</button>
-      <h1 id="hero-title" class="hero-title"><span>EARTH</span> <span>JUKEBOX</span></h1>
+      <h1 id="hero-title" class="hero-title"><span>TERRA</span><span>TONE</span></h1>
       <button class="orbit-arrow" id="next-feature" aria-label="Next feature">›</button>
     </div>
     <p id="hero-subtitle">Listen to the planet</p>
     <a id="hero-action" class="hero-action" href="#play">Open Jukebox <span aria-hidden="true">↗</span></a>
   </div>
-  <nav class="hero-features" aria-label="Explore Earth Jukebox">
+  <nav class="hero-features" aria-label="Explore Terratone">
     <a href="#play"><strong>Play</strong><span>Preview a dataset timeline</span></a>
     <a href="#scan"><strong>Scan</strong><span>Sweep west to east</span></a>
     <a href="#explore"><strong>Explore</strong><span>Inspect a location</span></a>
@@ -219,7 +219,7 @@
           <p id="legend-voice-status" role="status"></p>
           <label class="legend-first"><input id="legend-first" type="checkbox" checked> Hear the legend before playback</label>
         </section>
-        <section id="readout" class="panel info readout" aria-label="Dataset readout"><h3 id="readout-heading">Live readout</h3><div id="readout-value"></div><ol id="readout-timeline" aria-label="Recent readings"></ol></section>
+        <section id="readout" class="panel info readout" aria-label="Dataset readout"><h3 id="readout-heading">Live readout</h3><div id="readout-measurements"><div id="readout-value"></div><ol id="readout-timeline" aria-label="Recent readings"></ol></div><div id="legend-transcript" hidden><p class="eyebrow">Sonic legend narration</p><p id="legend-transcript-status" role="status"></p><ol aria-label="Narration transcript" aria-live="polite"></ol></div></section>
         <section class="panel info mapping-notes">
           <h3>How we mapped it</h3><p id="mapping"></p>
           <a id="source">NASA visualization ↗</a>
