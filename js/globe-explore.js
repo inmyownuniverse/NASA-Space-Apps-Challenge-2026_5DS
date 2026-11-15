@@ -53,6 +53,8 @@ export function bindGlobeExplore({ video, select, hear, probe, setFrameExplorer,
     onView?.(flat ? 'flat' : 'globe');
     if (announceIt) {
       status.textContent = flat ? 'Flat map: click, drag or use the arrow keys on the map below.' : status.textContent;
+      // The flat map sits below the explore console: bring it into view.
+      if (flat) byId('stage')?.scrollIntoView({ block: 'center', behavior: 'instant' });
     }
   }
   viewButtons[0]?.addEventListener('click', () => setView('globe', { announceIt: true }));
