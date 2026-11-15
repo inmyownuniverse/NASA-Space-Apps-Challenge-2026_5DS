@@ -1,5 +1,6 @@
 import { bindRocky } from './rocky.js';
 import { bindGlobeExplore } from './globe-explore.js';
+import { probeCell, hideProof } from './explore.js';
 import { analyze, resetAnalyzer } from './analyzer.js';
 import { demoFeatures } from './sound/demo.js';
 import { tuned } from './sound/tuning.js';
@@ -113,6 +114,7 @@ function selectDataset(data) {
   video.poster = data.preview ?? '';
   resetReadoutTimeline();
   byId('readout-value').textContent = 'Ready';
+  hideProof(); // the last dataset's reading must not stay on screen
   loadDataset(data);
   player.load(data);
   updateRocky(data, state.view === 'jukebox' && state.mode === 'play');
@@ -519,7 +521,9 @@ byId('mute-btn').addEventListener('click', (event) => {
 byId('share-btn').addEventListener('click', async () => {
   if (!dataset) return;
   const url = new URL(location.href);
-  url.search = new URLSearchParams({ dataset: dataset.id, t: Math.floor(player.currentTime()), mode: state.mode });
+  const params = { dataset: dataset.id, t: Math.floor(player.currentTime()), mode: state.mode };
+  if (state.mode === 'explore') params.view = globeExplore.view();
+  url.search = new URLSearchParams(params);
   try { await navigator.clipboard.writeText(url.href); announce('Link copied.'); }
   catch { announce(url.href); }
 });
@@ -706,6 +710,7 @@ async function start() {
   const id = params.get('dataset');
   const requested = datasets.find((item, index) => item.id === id || String(index + 1) === id);
   selectDataset(requested ?? datasets[0]);
+  if (['globe', 'flat'].includes(params.get('view'))) globeExplore.setView(params.get('view'));
   if (requested) {
     if (!location.hash) location.hash = MODES.includes(params.get('mode')) ? params.get('mode') : 'play';
     const time = Number(params.get('t'));
@@ -737,6 +742,14 @@ const globeExplore = bindGlobeExplore({
     await ensureAudio();
     if (dataset === data && state.view === 'jukebox' && state.mode === 'explore') {
       return playProbe(data, value, column);
+    }
+  },
+  // A pin or a click on the globe: read that cell, play it and show the proof panel.
+  async probe(data, column, row) {
+    await ensureAudio();
+    await player.ensureFrame();
+    if (dataset === data && state.view === 'jukebox' && state.mode === 'explore') {
+      return probeCell(data, column, row, byId('explore-proof-host'));
     }
   },
 });

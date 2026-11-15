@@ -886,6 +886,9 @@ button:hover { background: #21314a; }
 .explore-panels section { min-width: 0; padding: 1rem; background: #101216; border: 1px solid #30353c; border-radius: 14px; }
 .explore-panels h3 { margin-bottom: .7rem; }
 #explore-pins { display: flex; flex-wrap: wrap; gap: .45rem; }
+.explore-view { display: inline-flex; gap: .35rem; }
+.explore-view button { background: #17191d; border-color: #363a41; }
+.explore-view button[aria-pressed="true"] { border-color: #ffc784; color: #ffc784; }
 #explore-pins button { text-align: left; font-size: .85rem; }
 #explore-pins button:hover { border-color: #ffc784; }
 @media (max-width: 650px) {
