@@ -366,7 +366,12 @@ function onVolume() {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Narration audio comes from our local server (server.mjs). On a static site it isn't there:
+// after the first failure we stop asking for the rest of the visit.
+let narrationServer = null; // null = not tried, true = works, false = not available
+
 function playNarration(datasetId, language, line, signal) {
+  if (narrationServer === false) return Promise.reject(new Error('No narration server'));
   const query = new URLSearchParams({ dataset: datasetId, language, line });
   const audio = new Audio('api/legend-voice?' + query);
   return new Promise((resolve, reject) => {
@@ -384,8 +389,8 @@ function playNarration(datasetId, language, line, signal) {
     }
     if (signal.aborted) { abort(); return; }
     signal.addEventListener('abort', abort, { once: true });
-    audio.onended = () => finish(true);
-    audio.onerror = () => finish(false);
+    audio.onended = () => { narrationServer = true; finish(true); };
+    audio.onerror = () => { if (narrationServer === null) narrationServer = false; finish(false); };
     audio.play().catch(() => finish(false));
   });
 }
@@ -446,7 +451,9 @@ async function playLegend() {
     }
   } catch {
     if (!stopped()) {
-      status.textContent = 'Narration is unavailable in this language. Try again or choose English.';
+      status.textContent = narrationServer === false
+        ? 'Narration in this language works when you run the app locally with our server. Choose English to hear your browser’s voice.'
+        : 'Narration is unavailable in this language. Try again or choose English.';
       announce(status.textContent);
     }
     return false;
