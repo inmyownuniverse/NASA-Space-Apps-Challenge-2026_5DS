@@ -4,6 +4,28 @@ import { formatTime } from './a11y.js';
 const byId = (id) => document.getElementById(id);
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+/**
+ * Latitude covered by the dataset's map rows, from its config (latMax at the top row, latMin at
+ * the bottom). SST stops at about 79 degrees south; the others cover pole to pole.
+ */
+function latRange(data) {
+  return [data.latMax ?? 90, data.latMin ?? -90];
+}
+
+/** Row centre to polar angle on the globe (0 = north pole). */
+function rowTheta(data, y) {
+  const [top, bottom] = latRange(data);
+  const lat = top - ((y + 0.5) / data.grid.h) * (top - bottom);
+  return ((90 - lat) / 180) * Math.PI;
+}
+
+/** Latitude (from a globe click) to a map row, or -1 outside the map area. */
+export function latRow(data, lat) {
+  const [top, bottom] = latRange(data);
+  const row = Math.floor(((top - lat) / (top - bottom)) * data.grid.h);
+  return row >= 0 && row < data.grid.h ? row : -1;
+}
+
 export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
   const picker = byId('explore-dataset');
   const mount = byId('explore-globe');
@@ -22,6 +44,10 @@ export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
 
   async function inspect(column, row) {
     const run = ++selectionRun;
+    if (row < 0) {
+      selection.textContent = 'Outside the map area of this visualization.';
+      return;
+    }
     const value = grid[row * data.grid.w + column];
     const label = 'Row ' + (row + 1) + ' · Column ' + (column + 1);
     selection.textContent = label + ' · ' + valueText(value);
@@ -168,8 +194,9 @@ function createGlobe(THREE, mount, status, onFallback) {
       inspect(hit.object.userData.x, hit.object.userData.y);
       return;
     }
+    // uv.y is 1 at the north pole and 0 at the south pole.
     inspect(clamp(Math.floor(hit.uv.x * config.grid.w), 0, config.grid.w - 1),
-      clamp(Math.floor((1 - hit.uv.y) * config.grid.h), 0, config.grid.h - 1));
+      latRow(config, hit.uv.y * 180 - 90));
   });
 
   function zoom(factor) {
@@ -202,7 +229,7 @@ function createGlobe(THREE, mount, status, onFallback) {
       markers.clear();
       for (const pin of pins) {
         const phi = 2 * Math.PI * (pin.x + .5) / data.grid.w;
-        const theta = Math.PI * (pin.y + .5) / data.grid.h;
+        const theta = rowTheta(data, pin.y);
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
         marker.position.set(-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta)).multiplyScalar(1.015);
         marker.userData = pin;
