@@ -51,6 +51,7 @@
     "mapper": "layers",
     "scale": "C major pentatonic",
     "instruments": ["dust", "smoke", "salt", "sulfate"],
+    "layerKeys": { "dust": "dust", "smoke": "black_carbon", "salt": "sea_salt", "sulfate": "sulfate" },
     "valueTo": "layer volume",
     "changeTo": "filter",
     "legendExamples": [
@@ -62,10 +63,10 @@
   },
   "legend": [
     { "sound": "a low, cello-like drone", "means": "dust" },
-    { "sound": "a crackle", "means": "smoke" },
+    { "sound": "a crackle", "means": "black carbon (soot, mostly from fires)" },
     { "sound": "an airy shimmer", "means": "sea salt" },
     { "sound": "soft bells", "means": "sulfate" }
   ],
   "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
-  "_todo": "Freia: sound.instruments still says smoke/salt; the analyzer now emits the canonical keys black_carbon, dust, sea_salt, sulfate."
+  "_todo": "Sound: sound.layerKeys maps each instrument to the analyser's layer key (smoke plays black_carbon, salt plays sea_salt). Celene: check the legend wording."
 }

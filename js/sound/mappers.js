@@ -70,10 +70,17 @@ function colToPan(col, gw) {
   return gw > 1 ? Math.max(-1, Math.min(1, -1 + (2 * col) / (gw - 1))) : 0;
 }
 
-/** features.change (0..1) → filter cutoff, exponential between cfg.sound.filter [min, max]. */
+/**
+ * features.change (0..1) → filter cutoff, exponential between cfg.sound.filter [min, max].
+ * sound.changeRange [low, high] (measured on the real video) maps low to the darkest tone and high
+ * to the brightest; without it, change × changeBoost is used.
+ */
 function changeToCutoff(change, cfg) {
-  const [fMin, fMax] = cfg.sound.filter ?? [500, 5000];
-  const c = Math.min(1, Math.max(0, (change ?? 0) * (cfg.sound.changeBoost ?? 4))); // change is usually small
+  const s = cfg.sound;
+  const [fMin, fMax] = s.filter ?? [500, 5000];
+  const c = s.changeRange
+    ? norm(change ?? 0, s.changeRange[0], s.changeRange[1])
+    : Math.min(1, Math.max(0, (change ?? 0) * (s.changeBoost ?? 4))); // change is usually small
   return fMin * Math.pow(fMax / fMin, c);
 }
 
@@ -131,7 +138,11 @@ export function continuousField(features, cfg, inst, time) {
     features.max !== null && features.max !== undefined && features.max > s.tensionAbove;
   const budget = tense ? maxVoices - 1 : maxVoices;
 
-  const root = valueToMidi(avg, min, max, lo, hi, scale);
+  // The main note can use its own value range (rootRange: the range the average really moves in)
+  // and octaves (rootOctaves), so a small but real change in the average is still heard.
+  const [rMin, rMax] = s.rootRange ?? [min, max];
+  const [rLo, rHi] = s.rootOctaves ?? [lo, hi];
+  const root = valueToMidi(avg, rMin, rMax, rLo, rHi, scale);
   const notes = new Map([[root, s.rootVelocity ?? 0.35]]);
   const vals = validValues(features.grid);
   for (const p of [0.1, 0.9, 0.5, 0.25, 0.75, 0.0, 1.0]) {
@@ -150,10 +161,37 @@ export function continuousField(features, cfg, inst, time) {
 
 /**
  * Discrete events (lightning): one drum hit per new flash.
- *  - features.flashes = [{ x, y, value }] with x, y in grid cells (y = 0 is the north edge)
- *  - pan by column (west = left, east = right), pitch by row (north = higher)
+ *  - features.flashes from the analyser: [{ cell, intensity, ... }] where cell = row * gw + col
+ *    and intensity is relative brightness 0..100. Sample data uses [{ x, y, value }] in grid cells.
+ *  - pan by column (left of the screen = left ear), pitch by row (top of the screen = higher)
  *  - velocity by flash brightness; at most maxVoices hits per frame, brightest first
  */
+/**
+ * How many drum hits to play for this frame's new flashes. Without sound.flashCountRange, one hit
+ * per flash (up to maxVoices). With it, [few, many] new flashes per frame map to 1 .. maxVoices hits,
+ * so a quiet moment and a huge storm sound different instead of both maxing out.
+ */
+function flashHits(count, cfg, maxVoices) {
+  const r = cfg.sound.flashCountRange;
+  if (!r) return Math.min(count, maxVoices);
+  return Math.min(count, 1 + Math.round(norm(count, r[0], r[1]) * (maxVoices - 1)));
+}
+
+function flashCell(f, gw) {
+  if (Number.isInteger(f.cell)) return [f.cell % gw, Math.floor(f.cell / gw)];
+  return [f.x, f.y];
+}
+
+/** Flash brightness 0..1: analyser intensity (scaled by sound.intensityRange) or sample value. */
+function flashStrength(f, cfg) {
+  if (Number.isFinite(f.intensity)) {
+    const [lo, hi] = cfg.sound.intensityRange ?? [0, 100];
+    return norm(f.intensity, lo, hi);
+  }
+  const [min, max] = valueRange(cfg);
+  return norm(f.value ?? max, min, max);
+}
+
 export function events(features, cfg, inst, time) {
   const voice = inst;
   const s = cfg.sound;
@@ -163,17 +201,20 @@ export function events(features, cfg, inst, time) {
   const st = voice.state;
   const gw = cfg.grid?.w ?? 32;
   const gh = cfg.grid?.h ?? 16;
-  const [min, max] = valueRange(cfg);
   const { lo, hi, scale, maxVoices } = soundOpts(cfg);
 
-  const hits = [...flashes].sort((a, b) => (b.value ?? 0) - (a.value ?? 0)).slice(0, maxVoices);
+  const hits = [...flashes]
+    .map((f) => ({ f, strength: flashStrength(f, cfg) }))
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, flashHits(flashes.length, cfg, maxVoices));
   // Monophonic drum: every hit must start strictly after the previous one.
   let t = Math.max(time, (st.lastHit ?? 0) + 0.03);
-  for (const f of hits) {
-    voice.panner?.pan.setValueAtTime(colToPan(f.x, gw), t);
-    const midi = valueToMidi(gh - 1 - f.y, 0, gh - 1, lo, hi, scale);
+  for (const { f, strength } of hits) {
+    const [col, row] = flashCell(f, gw);
+    voice.panner?.pan.setValueAtTime(colToPan(col, gw), t);
+    const midi = valueToMidi(gh - 1 - row, 0, gh - 1, lo, hi, scale);
     const soft = s.softestHit ?? 0.3;
-    const vel = soft + (1 - soft) * norm(f.value ?? max, min, max);
+    const vel = soft + (1 - soft) * strength;
     voice.inst.triggerAttackRelease(midiToNote(midi), s.hitLength ?? '16n', t, vel);
     st.lastHit = t;
     t += s.hitSpacing ?? 0.06;
@@ -196,8 +237,10 @@ export function density(features, cfg, inst, time) {
 
   const [min, max] = valueRange(cfg);
   const { lo, hi, scale, maxVoices } = soundOpts(cfg);
+  // pitchRange: the values lit cells really have, so they use the whole pitch range.
+  const [pMin, pMax] = s.pitchRange ?? [min, max];
   const play = (value, t, vel) => {
-    const midi = valueToMidi(value, min, max, lo, hi, scale);
+    const midi = valueToMidi(value, pMin, pMax, lo, hi, scale);
     if (midi !== null) voice.inst.triggerAttackRelease(midiToNote(midi), s.noteLength ?? '8n', t, vel);
   };
 
@@ -217,21 +260,25 @@ export function density(features, cfg, inst, time) {
   st.lastBurst = time;
   if (!lit.length) return;
 
-  const n = Math.max(1, Math.min(maxVoices, Math.round(frac * maxVoices * (s.notesPerLitShare ?? 2))));
+  // litShareRange [low, high]: lit shares measured on the real video map to 1 .. maxVoices notes.
+  const n = s.litShareRange
+    ? 1 + Math.round(norm(frac, s.litShareRange[0], s.litShareRange[1]) * (maxVoices - 1))
+    : Math.max(1, Math.min(maxVoices, Math.round(frac * maxVoices * (s.notesPerLitShare ?? 2))));
   const spacing = (gap * 0.9) / n;
   const soft = s.softestNote ?? 0.15, loud = s.loudestNote ?? 0.6;
   for (let i = 0; i < n; i++) {
     const v = lit[Math.round((n === 1 ? 1 : i / (n - 1)) * (lit.length - 1))];
-    play(v, time + i * spacing, soft + (loud - soft) * norm(v, min, max));
+    play(v, time + i * spacing, soft + (loud - soft) * norm(v, pMin, pMax));
   }
-  if (growth > (s.sparkleGrowth ?? 0.01)) play(max, time + gap * 0.5, s.sparkleVelocity ?? 0.25);
+  if (growth > (s.sparkleGrowth ?? 0.01)) play(pMax, time + gap * 0.5, s.sparkleVelocity ?? 0.25);
 }
 
 /**
  * Layers (aerosols): one instrument per aerosol type on a shared chord.
  *  - layer i plays chord tone i (dust lowest … sulfate highest), so the layers blend
  *  - the whole chord shifts up slightly with the overall mean value
- *  - features.layers[name] (0..1) → that layer's volume (absent → silent)
+ *  - features.layers[key] (0..1) → that layer's volume (absent → silent); key is
+ *    sound.layerKeys[instrument name] when the analyser uses different names (black_carbon ...)
  *  - sustaining layers hold their note; percussive layers (bells) are re-struck every bellGap s
  *  - the densest layer above tensionAbove adds a semitone-up voice on that layer
  */
@@ -248,7 +295,8 @@ export function layers(features, cfg, inst, time) {
   applyChange(features, cfg, voice);
 
   const avg = smooth(st, 'mean', features.mean, smoothFrames);
-  const shift = avg === null ? 0 : Math.round(norm(avg, min, max) * (s.chordShift ?? 2)); // scale steps
+  const [shMin, shMax] = s.shiftRange ?? [min, max]; // range the overall amount really moves in
+  const shift = avg === null ? 0 : Math.round(norm(avg, shMin, shMax) * (s.chordShift ?? 2)); // scale steps
   const silentBelow = s.silentBelow ?? 0.02;
   const quiet = s.quietestLayer ?? -18, loud = s.loudestLayer ?? -6;
   st.loudestStrength = -1;
@@ -258,8 +306,10 @@ export function layers(features, cfg, inst, time) {
     const gain = voice.layerGains[name];
     if (!layerInst || !gain) return;
 
-    // TODO(Aahana): features.layers[name] is a placeholder until the analyzer measures layers.
-    const strength = Math.min(1, hasLayers ? (features.layers[name] ?? 0) : (s.placeholderStrength ?? 0.3));
+    const layerKey = s.layerKeys?.[name] ?? name;
+    const raw = hasLayers ? (features.layers[layerKey] ?? 0) : (s.placeholderStrength ?? 0.3);
+    // layerScale stretches the measured range so a typical strong layer reaches full volume.
+    const strength = Math.min(1, raw * (hasLayers ? (s.layerScale ?? 1) : 1));
     const db = strength <= silentBelow ? SILENT_DB : quiet + (loud - quiet) * strength;
     gain.volume.rampTo(db, s.layerFade ?? 0.5);
     if (strength > st.loudestStrength) { st.loudest = name; st.loudestStrength = strength; }

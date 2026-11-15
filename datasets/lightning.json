@@ -50,8 +50,8 @@
   },
   "legend": [
     { "sound": "a drum hit", "means": "a lightning flash" },
-    { "sound": "left or right", "means": "where on Earth the flash is, west or east" }
+    { "sound": "left or right", "means": "where the flash is on the screen, left or right" }
   ],
   "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
-  "_todo": "Aahana (data): crop, mask and flash thresholds measured on the real video — see media/README.md and tools/test_lightning.mjs. Freia: sound block unchanged and untuned for events. Celene: description/legend untouched and still to review."
+  "_todo": "Aahana (data): crop, mask and flash thresholds measured on the real video — see media/README.md and tools/test_lightning.mjs. Sound: tuned to the measured flash counts and intensity (js/sound/tuning.js). Celene: description/legend untouched and still to review."
 }

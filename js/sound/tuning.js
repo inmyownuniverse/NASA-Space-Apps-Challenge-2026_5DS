@@ -76,9 +76,12 @@ export const TUNING = {
       symphonyLevel: -6,      // extra level in Planet Symphony, on top of level, dB
       filter: [600, 4500],    // darkest tone (calm water) and brightest tone (fast currents), Hz
       filterGlide: 0.3,       // how fast the tone brightens or darkens, s
-      changeBoost: 4,         // how strongly current changes brighten the tone
+      changeBoost: 4,         // how strongly current changes brighten the tone (used without changeRange)
+      changeRange: [0.035, 0.085], // measured change on the real video: low = darkest tone, high = brightest
+      rootRange: [18.5, 22.5],     // measured range of the average temperature (°C): spread over the main note's octaves
+      rootOctaves: [3, 4],         // octaves the main note moves in
       chordChangeGap: 0.5,    // shortest time between chord changes, s
-      tensionAbove: 28,       // water warmer than this (°C) adds a tense note one semitone up
+      tensionAbove: 31,       // water warmer than this (°C) adds a tense note one semitone up (real max is 29.7 to 31.6)
       rootVelocity: 0.35,     // loudness of the main note (from average temperature)
       extraVelocity: 0.2,     // loudness of the other chord notes
       tensionVelocity: 0.12,  // loudness of the tense note
@@ -111,6 +114,8 @@ export const TUNING = {
       hitSpacing: 0.06,       // time between hits in the same frame, s
       hitLength: '16n',       // how long each hit is held
       softestHit: 0.3,        // hit strength for the dimmest flash (brightest is 1)
+      intensityRange: [88, 99],   // measured flash brightness (0 to 100): dimmest and brightest strikes
+      flashCountRange: [1, 50],   // new flashes per frame: 1 gives one hit, 50 or more gives maxVoices hits
       voices: {
         drum: {
           volume: -8,          // loudness of the drum body, dB
@@ -132,7 +137,9 @@ export const TUNING = {
       smoothFrames: 2,        // frames averaged together
       level: 7,               // loudness in Play, Scan and Legend, dB
       symphonyLevel: -8,      // extra level in Planet Symphony, on top of level, dB
-      litAbove: 5,            // brightness above which a grid cell counts as lit (nW/cm²/sr)
+      litAbove: 5,            // brightness index (0 to 100) above which a grid cell counts as lit
+      litShareRange: [0.05, 0.10], // measured share of lit cells: low gives 1 note, high gives maxVoices notes
+      pitchRange: [50, 85],   // measured brightness of lit cells: dimmest and brightest map to lowest and highest notes
       burstGap: 0.5,          // time between bursts of notes, s
       notesPerLitShare: 2,    // more means more notes for the same lit area
       noteLength: '8n',       // how long each sparkle is held
@@ -168,8 +175,11 @@ export const TUNING = {
       filterGlide: 0.3,           // how fast the tone follows changes, s
       changeBoost: 4,             // how strongly change opens the filter
       chordChangeGap: 0.5,        // shortest time between note changes per layer, s
-      tensionAbove: 0.8,          // a layer stronger than this (0 to 1) adds a tense note
+      changeRange: [0.33, 0.47],  // measured change on the real video: low = darkest tone, high = brightest
+      layerScale: 1.8,            // layer shares are 0.05 to 0.57 on the real video; this stretches them toward full volume
+      tensionAbove: 0.95,         // a layer stronger than this (after layerScale) adds a tense note
       chordShift: 2,              // how many scale steps the chord rises with the total amount
+      shiftRange: [0.19, 0.24],   // measured average aerosol coverage: low = no shift, high = full chordShift
       quietestLayer: -18,         // volume of a layer that is barely there, dB
       loudestLayer: -6,           // volume of a layer at full strength, dB
       silentBelow: 0.02,          // layers weaker than this (0 to 1) are silent

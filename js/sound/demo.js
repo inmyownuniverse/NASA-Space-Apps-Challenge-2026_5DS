@@ -75,7 +75,8 @@ export function demoFeatures(cfg, t) {
     grid = smoothGrid(gw, gh, t, min, max);
     const names = cfg.sound.instruments ?? [];
     names.forEach((name, i) => {
-      layers[name] = Math.max(0, 0.5 + 0.45 * Math.sin(t / 7 + i * 1.6));
+      const key = cfg.sound.layerKeys?.[name] ?? name; // the analyser's name for this layer
+      layers[key] = Math.max(0, 0.5 + 0.45 * Math.sin(t / 7 + i * 1.6));
     });
   } else {
     grid = smoothGrid(gw, gh, t, min, max);
