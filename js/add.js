@@ -59,6 +59,7 @@ function ready(src, img) {
   }
   canvas.width = source.videoWidth;
   canvas.height = source.videoHeight;
+  canvas.parentElement.style.aspectRatio = canvas.width + ' / ' + canvas.height;
   $('empty').hidden = true;
   $('cw').value = source.videoWidth;
   $('ch').value = source.videoHeight;

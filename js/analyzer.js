@@ -1045,7 +1045,7 @@ function extractLayers(px, w, h, gw, gh, cfg, masks) {
  * @param {object} [opts={}] optional configuration (e.g. { fake: true } for synthetic dev mode)
  * @returns {object} features (see top of file)
  */
-export function analyze(video, cfg, opts = {}) {
+function analyzeFrame(video, cfg, opts = {}) {
   // Explicit synthetic mode for development/testing only
   if (opts.fake === true) {
     return fakeFeatures(cfg);
@@ -1269,4 +1269,43 @@ export function resetAnalyzer() {
   prevTime = null;
   prevSegmentKey = null;
   resetFlashState();
+  historyByVideo = new WeakMap();
+  activeVideo = null;
+}
+
+// ---- per-video history (Planet Symphony analyses several videos in turn) ----
+// The extractors above keep one "previous frame" (prevGrid, prevTime, prevSegmentKey, flashState).
+// When a different video is analysed, that state is saved for the old video and restored for the
+// new one, so one video's previous frame never leaks into another's change or new-flash detection.
+// With a single video (the jukebox player) this does nothing and behaviour is unchanged.
+let historyByVideo = new WeakMap();
+let activeVideo = null;
+
+function saveHistory() {
+  return { prevGrid, prevTime, prevSegmentKey, flash: { ...flashState } };
+}
+
+function restoreHistory(h) {
+  prevGrid = h.prevGrid;
+  prevTime = h.prevTime;
+  prevSegmentKey = h.prevSegmentKey;
+  Object.assign(flashState, h.flash);
+}
+
+/**
+ * Analyse the current video frame (see analyzeFrame and the notes at the top of the file).
+ * @param {HTMLVideoElement} video
+ * @param {object} cfg dataset config (datasets/*.json)
+ * @param {object} [opts={}] optional configuration (e.g. { fake: true } for synthetic dev mode)
+ * @returns {object} features
+ */
+export function analyze(video, cfg, opts = {}) {
+  if (video && typeof video === 'object' && video !== activeVideo) {
+    if (activeVideo) historyByVideo.set(activeVideo, saveHistory());
+    const h = historyByVideo.get(video);
+    if (h) restoreHistory(h);
+    else { prevGrid = null; prevTime = null; prevSegmentKey = null; resetFlashState(); }
+    activeVideo = video;
+  }
+  return analyzeFrame(video, cfg, opts);
 }

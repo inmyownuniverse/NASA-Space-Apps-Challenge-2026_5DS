@@ -81,7 +81,7 @@ export function describe(features, cfg, t) {
   if (features.fake) text += ' (sample data)';
   // TODO(Celene): friendlier, dataset-specific wording (e.g. "the Gulf Stream is warming").
 
-  const readout = document.getElementById('readout');
+  const readout = document.getElementById('readout-value');
   if (readout) readout.textContent = text;
   announce(text, { data: true });
   return text;

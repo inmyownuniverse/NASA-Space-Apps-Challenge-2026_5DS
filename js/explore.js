@@ -98,7 +98,7 @@ function panelEl() {
     <p class="probe-value"></p>
     <p class="probe-how"></p>
     <p class="probe-note"></p>`;
-  const readout = document.getElementById('readout');
+  const readout = document.getElementById('readout-value');
   (readout?.parentElement ?? document.body).insertBefore(el, readout?.nextSibling ?? null);
   return el;
 }

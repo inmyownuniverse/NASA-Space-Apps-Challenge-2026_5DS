@@ -151,8 +151,8 @@ function startScanning() {
   scanning = true;
   startScan(cfg, () => frame, (col, notes) => {
     drawScanColumn(col);
-    const text = `Column ${col + 1} of ${cfg.grid.w}, west to east: ${notes.join(' ') || 'no data'}`;
-    const readout = document.getElementById('readout');
+    const text = `Column ${col + 1} of ${cfg.grid.w}, west to east: ${notes.join(' ') || 'no data'}${frame.fake ? ' (sample data)' : ''}`;
+    const readout = document.getElementById('readout-value');
     if (readout) readout.textContent = text;
   });
   announce('Scan mode: sweeping this frame from west to east. Press Space to go back to playing.');
