@@ -19,6 +19,9 @@ let simStart = 0, simOffset = 0;
 let rafId = null, vfcId = null;
 let disableExplore = null;
 let latest = null;         // features of the last analysed frame (Scan, Explore, summaries)
+// A paused video that has never played (preload="metadata") reports readyState 4 but has not
+// decoded a picture yet, so drawing it gives a black frame. One seek decodes it.
+let frameReady = false;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -33,7 +36,13 @@ function els() {
     missing = true;
     showMessage(`Video not found. Download it from the SVS page (${cfg?.source ?? ''}) and save as ${cfg?.video ?? 'media/'}.`);
   });
-  video.addEventListener('loadeddata', () => { missing = false; showMessage(''); });
+  video.addEventListener('loadeddata', () => {
+    missing = false;
+    showMessage('');
+    if (video.paused && !video.seeking) video.currentTime = video.currentTime; // decode the first frame
+  });
+  video.addEventListener('seeked', () => { frameReady = true; });
+  video.addEventListener('playing', () => { frameReady = true; });
   video.addEventListener('ended', () => pause());
 }
 
@@ -54,6 +63,7 @@ export function load(newCfg) {
   pause();
   cfg = newCfg;
   latest = null; // features of the previous dataset must not leak into Explore or summaries
+  frameReady = false;
   missing = false;
   simOffset = 0;
   lastT = -Infinity;
@@ -75,6 +85,22 @@ export async function play() {
   if (missing) simStart = performance.now();
   announce(`Playing ${cfg.title}`);
   loop();
+}
+
+/**
+ * Resolve once the paused frame on screen has really been decoded (see frameReady), so it can be
+ * analysed. Resolves straight away while playing, when the frame is ready, or when the video is missing.
+ */
+export function ensureFrame() {
+  els();
+  if (missing || frameReady || !video.src) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(done, 2000);
+    video.addEventListener('seeked', done, { once: true });
+    video.addEventListener('error', done, { once: true });
+    if (video.readyState >= 1 && !video.seeking) video.currentTime = video.currentTime;
+  });
 }
 
 /** Features of the most recent analysed frame, or null before the first frame. */
@@ -139,11 +165,12 @@ let scanning = false;
 
 function startScanning() {
   if (playing) pause();
-  if (!missing && video.readyState < 2) {
-    // Frame not decoded yet (dataset just loaded): start once it is, or once we know it's missing.
+  if (!missing && (video.readyState < 2 || !frameReady)) {
+    // Frame not decoded yet: start once it is, or once we know the video is missing.
     const retry = () => { if (mode === 'scan' && !scanning) startScanning(); };
-    video.addEventListener('loadeddata', retry, { once: true });
+    video.addEventListener('seeked', retry, { once: true });
     video.addEventListener('error', retry, { once: true });
+    if (video.readyState >= 2 && !video.seeking) video.currentTime = video.currentTime;
     return;
   }
   const t = currentTime();
