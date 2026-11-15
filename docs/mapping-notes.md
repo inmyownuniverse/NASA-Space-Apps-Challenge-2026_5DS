@@ -31,7 +31,8 @@ compression noise.
 **Extreme values add tension.** When a value goes past a danger line, we add one quiet extra note
 just one semitone above a main note. Those two notes rub against each other and sound uneasy. It is
 the only note in the app that is outside the scale, so it stands out. Right now this is used for
-very warm sea water (above 28 °C) and for very dense aerosol layers (above 80% strength).
+the very warmest sea water (above 31 °C, which only the hottest spots reach some of the time) and
+for an aerosol type that clearly takes over the picture.
 
 **The mix is kept safe.** Every sound goes through a little room echo and then a limiter, which stops
 the sound from getting so loud that it distorts. Each dataset has its own level so that none of them
@@ -54,7 +55,7 @@ yellow, and warm water is orange and red.
   frame. So a map with a big temperature range gives a wide chord, and an even map gives a narrow one.
 - When the picture changes a lot from one frame to the next (fast-moving currents), the tone gets
   brighter. When the ocean is calm, the tone is darker and softer.
-- If any water is warmer than 28 °C, a quiet note one semitone up is added, which makes the chord
+- If any water is warmer than 31 °C, a quiet note one semitone up is added, which makes the chord
   sound tense.
 - In Scan mode, each column of the map plays a chord of three notes: the southern part in a low
   octave, the middle in the middle octave and the northern part in a high octave.
@@ -62,12 +63,14 @@ yellow, and warm water is orange and red.
 **Why we chose this sound.** The ocean moves slowly and smoothly, so a slow pad that fades in and out
 feels like it. Temperature goes up and down smoothly too, so it makes sense as pitch. Brightness for
 fast currents works because a brighter tone sounds more active, the way choppy water looks more active.
-Tension above 28 °C marks water warm enough to matter for things like coral bleaching and storms.
+Tension above 31 °C marks the very warmest water, warm enough to matter for things like coral
+bleaching and storms. (Some water in this video is always above 28 °C, so 31 °C is where it becomes
+the exception you notice.)
 
 **What to notice with your eyes closed.**
 - Whether the ocean overall is warm (high chord) or cold (low chord).
 - Whether the temperatures are spread out (wide chord) or similar everywhere (close notes).
-- When the chord starts to sound tense, some water has gone above 28 °C.
+- When the chord starts to sound tense, some water has gone above 31 °C.
 - When the sound gets brighter, the currents are moving faster.
 
 ## Lightning from the ISS (`lightning`)
@@ -75,15 +78,18 @@ Tension above 28 °C marks water warm enough to matter for things like coral ble
 **What you see.** Footage of Earth from the International Space Station. Lightning flashes show up as
 short bright spots in the clouds.
 
-**What we measure per frame.** TODO(Aahana)
+**What we measure per frame.** Each new strike: a bright yellow blob with a white-hot centre. Stars,
+the station's track line and its label are bright but have no yellow glow, so they are not counted.
+Strikes stay on screen for a while, so only strikes that are new since the last frame make sound. The
+globe moves and zooms, so a position on screen is not a fixed place on Earth.
 
 **What you hear.**
-- One deep drum hit for every lightning flash, with a short crack of noise on top.
-- Flashes in the west sound on the left and flashes in the east sound on the right.
-- Flashes further north are higher drum notes and flashes further south are lower.
+- Deep drum hits for new lightning flashes, with a short crack of noise on top.
+- More new flashes at once means more hits, from 1 for a single flash up to 4 for a big burst.
+- Flashes on the left of the screen sound on the left and flashes on the right sound on the right.
+- Flashes higher on the screen are higher drum notes and lower ones are lower.
 - Brighter flashes hit harder.
-- At most 4 hits per moment, brightest first, played a tiny bit apart so they don't blur together.
-- When there is no lightning, there is silence.
+- When there is no new lightning, there is silence.
 
 **Why we chose this sound.** A drum hit and a lightning flash are both sudden and short, so one
 matches the other without any explaining. The noise crack on top sounds like the snap of a strike.
@@ -92,18 +98,21 @@ it a darker, stormier mood than the other datasets.
 
 **What to notice with your eyes closed.**
 - How often lightning strikes: a few hits or a busy drum pattern.
-- Where the storm is: left (west) or right (east), and high (north) or low (south).
+- Where the storm is on the screen: left or right, high or low.
 - A really bright strike as a harder hit.
 
 ## Night Lights 2012–2023 (`nightlights`)
 
 **What you see.** Earth at night, year by year. Cities and towns glow. Brighter areas mean more light.
 
-**What we measure per frame.** TODO(Aahana)
+**What we measure per frame.** How bright each part of the map looks, as a brightness index from 0
+to 100 (0 is dark). It is how bright the picture is, not a measured amount of light. Labels and
+pop-out panels are covered up and give no data. Parts of the video show a change map with a
+different colour meaning; those parts are left silent on purpose.
 
 **What you hear.**
 - Short sparkling glass or bell notes in bursts, two per second, with a soft echo.
-- The more of the map that is lit, the more notes in each burst (up to 6).
+- The more of the map that is lit, the more notes in each burst (from 1 up to 6).
 - Brighter places play higher and louder notes. Dim places play lower and softer notes.
 - When the lit area grows from one frame to the next, an extra high sparkle note plays.
 - A part of the map only counts as lit if it is brighter than a small threshold, so dark ocean and
@@ -121,24 +130,26 @@ The extra sparkle on growth lets you hear new lights switching on over the years
 ## GEOS Aerosols (`aerosols`)
 
 **What you see.** A NASA computer model of tiny particles floating in the air. Each kind has its own
-colour: dust, smoke, sea salt and sulfate.
+colour: dust, black carbon (soot, mostly from fires), sea salt and sulfate.
 
-**What we measure per frame.** TODO(Aahana)
+**What we measure per frame.** Each pixel is sorted into one of the four types by its colour (hue),
+using the legend swatches as the reference. We get how much of the picture each type covers, as a
+share of all the aerosol colour on screen, and how much of each map cell shows aerosol colour. These
+are shares of picture area, not amounts of mass.
 
 **What you hear.**
 - Four different instruments, one for each kind of particle, all playing notes from one shared chord
   so they blend instead of clashing:
   - dust is a low, rough drone, a bit like a cello
-  - smoke is a crackling noise, like a fire
+  - black carbon (smoke and soot) is a crackling noise, like a fire
   - sea salt is a soft, airy, high shimmer
   - sulfate is soft bells that ring about once a second
 - Each instrument gets louder when there is more of its particle and goes silent when there is none.
 - The whole chord moves up a little when the total amount of particles is higher.
-- If one kind of particle is very dense (above 80%), it adds a tense note one semitone up.
-- Note: until the analyser can measure each particle type, all four play at a fixed 30% strength.
+- If one kind of particle clearly takes over the picture, it adds a tense note one semitone up.
 
 **Why we chose this sound.** Each sound matches its particle. Dust is heavy and low, so it gets the
-lowest, roughest sound. Smoke comes from fires, so it crackles. Sea salt comes from ocean spray, so it
+lowest, roughest sound. Black carbon is soot from fires, so it crackles. Sea salt comes from ocean spray, so it
 is light and airy. Sulfate often comes from volcanoes and pollution and forms tiny droplets, so it gets
 small clear bells. Using one shared chord means you can hear all four at once without a mess.
 
@@ -169,6 +180,9 @@ Short plain notes on what each feature does and why it matters. One line per fea
   colour, and takes the middle value. If the spot itself has no water colour it uses the nearest ocean
   pixel and says so. When there is no value it says why: land or no data, a current line, or a colour
   outside the colour bar.
+  For night lights, lightning and aerosols the panel shows the analyser's own reading for that map
+  cell (brightness index, number of strikes, or how much aerosol colour and which type), which is
+  exactly the number the music uses.
 - **Shareable links.** The address always matches what you are hearing, for example
   `index.html?dataset=sst&t=30&mode=scan`. The "Copy link" button copies a link to this exact moment,
   so anyone (a judge, a teacher, another website) opens the same dataset, time and mode. Browsers only
