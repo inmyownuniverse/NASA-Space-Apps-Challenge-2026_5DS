@@ -4,31 +4,48 @@
   "source": "https://svs.gsfc.nasa.gov/3912/",
   "video": "media/sst.mp4",
   "dates": "TODO: copy from SVS page",
-  "description": "Ocean currents coloured by surface temperature. Warm water is red, cold is blue.",
-  "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+  "description": "Ocean currents coloured by surface temperature. Cold water is blue, then green and yellow, and the warmest water is red.",
+  "crop": { "x": 0, "y": 0, "w": 1280, "h": 600 },
   "grid": { "w": 32, "h": 16 },
   "colorbar": {
     "unit": "°C",
     "stops": [
-      { "rgb": [8, 29, 88], "value": 0 },
-      { "rgb": [178, 24, 43], "value": 30 }
+      { "rgb": [45, 81, 216], "value": 0.0 },
+      { "rgb": [50, 126, 226], "value": 2.133 },
+      { "rgb": [50, 159, 200], "value": 4.267 },
+      { "rgb": [51, 188, 176], "value": 6.4 },
+      { "rgb": [54, 214, 152], "value": 8.533 },
+      { "rgb": [57, 240, 127], "value": 10.667 },
+      { "rgb": [60, 255, 105], "value": 12.8 },
+      { "rgb": [67, 255, 82], "value": 14.933 },
+      { "rgb": [101, 255, 59], "value": 17.067 },
+      { "rgb": [156, 255, 42], "value": 19.2 },
+      { "rgb": [213, 255, 34], "value": 21.333 },
+      { "rgb": [251, 255, 33], "value": 23.467 },
+      { "rgb": [250, 212, 30], "value": 25.6 },
+      { "rgb": [248, 150, 27], "value": 27.733 },
+      { "rgb": [247, 70, 25], "value": 29.867 },
+      { "rgb": [241, 0, 23], "value": 32.0 }
     ],
-    "maxDist": 60
+    "maxDist": 75
   },
   "sound": {
     "mapper": "continuousField",
     "scale": "C major pentatonic",
-    "octaves": [3, 5],
     "instrument": "warmPad",
     "valueTo": "pitch",
     "changeTo": "filter",
-    "maxVoices": 6,
-    "smoothFrames": 3,
-    "tensionAbove": 28
+    "legendExamples": [
+      { "values": [24, 27, 30] },
+      { "values": [6, 3, 0] },
+      { "values": [15], "sweep": true }
+    ]
   },
   "legend": [
     { "sound": "high notes", "means": "warm water" },
-    { "sound": "low notes", "means": "cold water" }
+    { "sound": "low notes", "means": "cold water" },
+    { "sound": "brighter, sweeping tone", "means": "fast-moving currents" }
   ],
-  "_todo": "Aahana: measure crop box and sample real colorbar stops. Freia: tune sound block."
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
+  "_todo": "Freia: tune sound block."
 }

@@ -1,97 +1,244 @@
 <!doctype html>
-<!-- Owner: Hazel · Support: Celene -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Earth Jukebox</title>
-  <meta name="description" content="Hear NASA Earth visualizations as music made from the real data in every frame.">
+  <meta name="description" content="Explore NASA Earth visualizations through sound.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&amp;display=swap">
+  <link rel="icon" type="image/svg+xml" href="media/rocket-cursor.svg">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/main.js"></script>
 </head>
-<body>
-  <a class="skip-link" href="#player">Skip to player</a>
-
-  <header class="site-header">
-    <h1>Earth Jukebox</h1>
-    <p class="tagline">Pick a NASA Earth visualization and hear the real data in every frame.</p>
-  </header>
-
-  <main class="layout">
-    <!-- Jukebox list: one button per dataset, built by js/main.js from datasets/index.json -->
-    <nav class="panel jukebox" aria-labelledby="jukebox-heading">
-      <h2 id="jukebox-heading">Jukebox</h2>
-      <ul id="dataset-list" class="dataset-list">
-        <li class="loading">Loading datasets…</li>
-      </ul>
+<body class="home-active">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="shell header">
+    <a class="brand" href="#home"><span class="brand-icon" aria-hidden="true"></span><span>EARTH<br>JUKEBOX</span></a>
+    <nav id="site-navigation" aria-label="Studio views">
+      <a href="#home" aria-current="page">Home</a>
+      <a href="#play">Play</a>
+      <a href="#explore">Explore</a>
+      <a href="#symphony">Planet Symphony</a>
+      <a href="add.html">Add visualization</a>
     </nav>
+    <button id="menu-toggle" aria-controls="site-navigation" aria-expanded="false" aria-label="Toggle navigation">☰</button>
+  </header>
+  <main id="main" class="shell" tabindex="-1">
+<section id="home" class="flight" aria-labelledby="hero-title">
+  <div class="landing">
+  <div class="starfield" aria-hidden="true"></div>
+  <div class="planet planet-main" aria-hidden="true"></div>
+  <div class="planet planet-left" aria-hidden="true"></div>
+  <div class="planet planet-right" aria-hidden="true"></div>
+  <div id="orbit-scene" aria-hidden="true"></div>
+  <div class="flight-light" aria-hidden="true"></div>
+  <div class="hero-copy">
+    <p class="hero-kicker">NASA EARTH OBSERVATIONS</p>
+    <div class="hero-heading">
+      <button class="orbit-arrow" id="previous-feature" aria-label="Previous feature">‹</button>
+      <h1 id="hero-title" class="hero-title"><span>EARTH</span> <span>JUKEBOX</span></h1>
+      <button class="orbit-arrow" id="next-feature" aria-label="Next feature">›</button>
+    </div>
+    <p id="hero-subtitle">Listen to the planet</p>
+    <a id="hero-action" class="hero-action" href="#play">Open Jukebox <span aria-hidden="true">↗</span></a>
+  </div>
+  <nav class="hero-features" aria-label="Explore Earth Jukebox">
+    <a href="#play"><strong>Play</strong><span>Preview a dataset timeline</span></a>
+    <a href="#scan"><strong>Scan</strong><span>Sweep west to east</span></a>
+    <a href="#explore"><strong>Explore</strong><span>Inspect a location</span></a>
+    <a href="#symphony"><strong>Planet Symphony</strong><span>See four datasets together</span></a>
+  </nav>
+  <a class="flight-cue" href="#dataset-showcase">Explore the datasets <span aria-hidden="true">↓</span></a>
+  <div class="flight-progress" aria-hidden="true"></div>
+  </div>
+</section>
 
-    <!-- Player: muted video (no native controls) + overlay canvas + custom controls -->
-    <section id="player" class="panel player" aria-labelledby="player-heading" tabindex="-1">
-      <h2 id="player-heading">Now playing: <span id="now-playing">nothing yet</span></h2>
-
-      <div class="stage">
-        <video id="video" muted playsinline preload="metadata" aria-hidden="true"></video>
-        <canvas id="overlay" class="overlay" width="1280" height="720"
-                role="img" aria-label="Visualization. Use Explore mode to hear values by position."></canvas>
-        <p id="player-message" class="player-message" role="status" hidden></p>
-      </div>
-
-      <div class="controls" role="group" aria-label="Player controls">
-        <button id="play-btn" type="button" aria-label="Play">Play</button>
-
-        <label for="scrub" class="visually-hidden">Position</label>
-        <input id="scrub" type="range" min="0" max="100" step="0.1" value="0"
-               aria-valuetext="0:00 of 0:00">
-        <span id="time" class="time" aria-hidden="true">0:00 / 0:00</span>
-
-        <div class="modes" role="group" aria-label="Mode">
-          <button type="button" class="mode-btn" data-mode="play" aria-pressed="true">Play</button>
-          <button type="button" class="mode-btn" data-mode="scan" aria-pressed="false">Scan</button>
-          <button type="button" class="mode-btn" data-mode="explore" aria-pressed="false">Explore</button>
-        </div>
-
-        <label for="volume">Volume</label>
-        <input id="volume" type="range" min="-40" max="0" step="1" value="-8" aria-valuetext="-8 decibels">
-      </div>
+    <div id="home-details">
+    <section id="dataset-showcase" class="showcase" aria-labelledby="showcase-title">
+      <ul id="showcase-cards" class="showcase-cards" aria-label="NASA datasets"></ul>
+      <h2 id="showcase-title" tabindex="-1">Hear Earth in four ways.</h2>
+      <a class="showcase-action" href="#play">Open Jukebox <span aria-hidden="true">↗</span></a>
     </section>
 
-    <!-- Info panel: description, legend, mapping explanation, live readout -->
-    <aside class="panel info" aria-labelledby="info-heading">
-      <h2 id="info-heading">About this dataset</h2>
-      <p id="description">Choose a dataset from the jukebox.</p>
-
-      <button id="legend-btn" type="button">Play legend</button>
-      <ul id="legend" class="legend"></ul>
-
-      <h3>How we mapped it</h3>
-      <p id="mapping">—</p>
-
-      <h3>Live readout</h3>
-      <p id="readout" class="readout">—</p>
-
-      <details class="shortcuts">
-        <summary>Keyboard shortcuts</summary>
-        <dl>
-          <dt>Space</dt><dd>Play / pause</dd>
-          <dt>← / →</dt><dd>Scrub 5 seconds</dd>
-          <dt>↑ / ↓</dt><dd>Volume</dd>
-          <dt>1–4</dt><dd>Pick dataset</dd>
-          <dt>M</dt><dd>Cycle mode (Play, Scan, Explore)</dd>
-          <dt>L</dt><dd>Play legend</dd>
-          <dt>D</dt><dd>Describe current frame</dd>
-          <dt>Esc</dt><dd>Stop sound</dd>
-        </dl>
-      </details>
-    </aside>
+    <section class="shell home-process" aria-labelledby="process-title">
+      <p class="eyebrow">How it works</p>
+      <h2 id="process-title">From Earth data to sound.</h2>
+      <div class="sound-marquee" aria-hidden="true">
+        <div class="sound-track"><div class="sound-group">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14V5a2 2 0 0 1 4 0v9a4 4 0 1 1-4 0ZM12 9v8"/></svg> Ocean temperature</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-8 12h6l-1 8 9-12h-6z"/></svg> Lightning flashes</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15A8 8 0 0 1 9 4a8.5 8.5 0 1 0 11 11Z"/></svg> Night lights</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 9-5 9 5-9 5zM3 12l9 5 9-5M3 16l9 5 9-5"/></svg> Aerosol layers</span>
+        </div></div>
+        <div class="sound-track"><div class="sound-group">
+          <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17V5l9-2v12M10 17a3 2 0 1 1-6 0 3 2 0 0 1 6 0ZM19 15a3 2 0 1 1-6 0 3 2 0 0 1 6 0Z"/></svg> Pitch</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4m10-8 4 4-4 4"/></svg> Stereo position</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-4m4 8V6m4 15V3m4 15V6m4 8v-4"/></svg> Note density</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8c4-7 6 7 10 0s6 7 10 0M2 16c4-7 6 7 10 0s6 7 10 0"/></svg> Timbre</span>
+        </div></div>
+      </div>
+      <div class="home-steps">
+        <a href="#play"><strong>Play a timeline <span aria-hidden="true">↗</span></strong><p>Follow changes over time and use the sonic legend to see what each sound represents.</p></a>
+        <a href="#scan"><strong>Sweep the map <span aria-hidden="true">↗</span></strong><p>Move west to east to see how a spatial pattern becomes a sequence.</p></a>
+        <a href="#explore"><strong>Inspect a location <span aria-hidden="true">↗</span></strong><p>Choose a grid cell with your keyboard, mouse, or touch to read its preview value.</p></a>
+      </div>
+    </section>
+    <section class="home-symphony" aria-labelledby="home-symphony-title">
+      <div class="shell">
+        <h2 id="home-symphony-title">Planet Symphony</h2>
+        <p>See ocean currents, lightning, city lights, and airborne particles side by side.</p>
+        <a class="showcase-action" href="#symphony">Open Planet Symphony <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+    </div>
+    <section id="explore-console" hidden aria-labelledby="explore-title">
+      <div class="explore-map">
+        <div id="explore-globe"></div>
+        <div class="explore-toolbar">
+          <h2 id="explore-title">Explore by location</h2>
+          <label>Dataset <select id="explore-dataset"></select></label>
+        </div>
+        <div class="explore-zoom" aria-label="Map zoom">
+          <button type="button" data-globe-zoom="in" aria-label="Zoom in">+</button>
+          <button type="button" data-globe-zoom="out" aria-label="Zoom out">−</button>
+          <button type="button" data-globe-zoom="reset">Reset</button>
+        </div>
+        <p id="explore-map-status">Drag to rotate · Scroll to zoom · Select a point to hear it</p>
+      </div>
+      <div class="explore-metrics">
+        <div><span>Valid cells</span><strong id="explore-count">—</strong></div>
+        <div><span>Mean</span><strong id="explore-mean">—</strong></div>
+        <div><span>Maximum</span><strong id="explore-max">—</strong></div>
+        <div><span>Frame</span><strong id="explore-time">—</strong></div>
+      </div>
+      <div class="explore-panels">
+        <section><h3>Marked locations</h3><div id="explore-pins"></div></section>
+        <section><h3>Selected location</h3><p id="explore-selection">Choose a point on the globe or from the list.</p></section>
+      </div>
+    </section>
+    <div id="jukebox" class="layout" hidden>
+      <section class="play-summary" aria-labelledby="play-summary-title" hidden>
+        <div class="play-heading">
+        <p class="eyebrow">Earth observation · Play</p>
+        <h2 id="play-summary-title">Earth visualization</h2>
+        <p id="play-summary-dates" class="eyebrow"></p>
+        <button id="dataset-notes" aria-haspopup="dialog" disabled>Dataset details ↗</button>
+        </div>
+        <p id="play-summary-description"></p>
+      </section>
+      <nav class="panel library" aria-labelledby="library-heading">
+        <h3 id="library-heading">Dataset library</h3>
+        <ul id="datasets" class="datasets"><li>Loading datasets…</li></ul>
+      </nav>
+      <section class="panel player" aria-labelledby="dataset-title">
+        <div class="player-heading">
+          <p id="dataset-dates" class="eyebrow"></p>
+          <h3 id="dataset-title">Earth visualization</h3>
+        </div>
+        <div id="stage" class="stage">
+          <video id="video" muted playsinline preload="metadata" aria-hidden="true"></video>
+          <canvas id="overlay" class="overlay" width="1280" height="720" aria-label="Explore visualization"></canvas>
+          <p id="player-message" class="player-message" role="status" hidden></p>
+          <p class="eyes-message" aria-hidden="true">Eyes-closed mode. Press E to show the map.</p>
+        </div>
+        <p id="instruction" class="instruction"></p>
+        <div id="player-controls" class="controls" role="group" aria-label="Dataset playback">
+          <div class="transport"><button id="play-btn" class="primary" type="button">Play</button>
+            <label class="timeline"><span>Timeline</span> <input id="scrub" type="range" min="0" max="100" step="0.1" value="0"></label>
+            <output id="time"></output>
+          </div>
+          <div class="volume"><button id="mute-btn" type="button" aria-pressed="false">Mute</button>
+            <label><span>Volume</span> <input id="volume" type="range" min="-40" max="0" value="-8"></label>
+          </div>
+          <button id="eyes-btn" type="button" aria-pressed="false">Eyes closed</button>
+          <button id="record-btn" type="button" aria-pressed="false">Record track</button>
+          <button id="share-btn" type="button">Copy link</button>
+        </div>
+        <div class="modes" role="group" aria-label="Exploration mode">
+          <button data-mode="play" aria-pressed="true">Play</button>
+          <button data-mode="scan" aria-pressed="false">Scan</button>
+        </div>
+      </section>
+      <section id="rocky" hidden aria-label="Rocky">
+        <button id="rocky-chat" type="button" aria-label="Open Rocky chat" aria-controls="rocky-chat-panel" aria-expanded="false">
+          <img class="rocky-mascot" src="media/rocky.png" alt="" width="90" height="90">
+        </button>
+        <p id="rocky-greeting" hidden>Rocky from Erid, reporting for science! Grace taught me about Earth. Your planet makes excellent music for a rock. Tap me to ask a question!</p>
+        <div id="rocky-chat-panel" class="rocky-content" hidden>
+          <div class="rocky-heading">
+            <div class="rocky-identity">
+              <img src="media/rocky.png" alt="" width="38" height="38">
+              <h3 id="rocky-title">Rocky</h3>
+            </div>
+            <div class="rocky-header-actions">
+              <button id="rocky-search" type="button" aria-label="Choose what Rocky explains" aria-expanded="false" aria-controls="rocky-search-options">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5 5"/></svg>
+              </button>
+            <button id="rocky-close" type="button" aria-label="Close Rocky chat">×</button>
+            </div>
+          </div>
+          <div id="rocky-search-options" hidden>
+            <button id="rocky-tour-start" type="button">Entire page</button>
+            <button id="rocky-section-start" type="button">Section</button>
+          </div>
+          <div id="rocky-section-picker" hidden>
+            <p tabindex="-1">Drag over content, then press Enter. You can also choose a section below.</p>
+            <div id="rocky-section-list"></div>
+          </div>
+          <div id="rocky-tour" hidden>
+            <p class="eyebrow" id="rocky-tour-step"></p>
+            <p id="rocky-tour-copy" role="status"></p>
+            <div class="rocky-tour-actions">
+              <button id="rocky-tour-end" type="button">End tour</button>
+              <button id="rocky-tour-next" type="button">Next stop</button>
+            </div>
+          </div>
+          <p id="rocky-answer" role="status"></p>
+          <form>
+            <label for="rocky-question">Ask a science question</label>
+            <div><input id="rocky-question" required maxlength="280" autocomplete="off" placeholder="Why do the notes change?"><button type="submit">Ask</button></div>
+          </form>
+        </div>
+      </section>
+      <aside class="details" aria-label="Dataset information">
+        <section class="panel info"><h3>About this dataset</h3><p id="description"></p></section>
+        <section class="panel info sonic-legend">
+          <h3>Sonic legend</h3><div id="legend-scale" hidden><div class="legend-gradient"></div><div class="legend-endpoints"><span><strong id="legend-low"></strong><br>Lower pitch</span><span><strong id="legend-high"></strong><br>Higher pitch</span></div></div><ul id="legend"></ul>
+          <div class="legend-waveform" aria-hidden="true"><svg viewBox="0 0 640 140" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="legend-wave-colors"></linearGradient></defs><path d="M0,70.0 L8,69.8 L16,69.6 L24,69.4 L32,69.2 L40,69.0 L48,68.8 L56,68.6 L64,68.2 L72,67.6 L80,66.8 L88,65.8 L96,64.3 L104,62.6 L112,60.5 L120,58.1 L128,55.5 L136,52.7 L144,49.9 L152,47.1 L160,44.5 L168,42.1 L176,40.2 L184,38.8 L192,37.9 L200,37.6 L208,38.0 L216,39.0 L224,40.6 L232,42.6 L240,45.0 L248,47.6 L256,50.3 L264,53.0 L272,55.4 L280,57.4 L288,58.9 L296,59.8 L304,60.0 L312,59.6 L320,58.5 L328,56.8 L336,54.5 L344,51.8 L352,48.8 L360,45.7 L368,42.6 L376,39.7 L384,37.2 L392,35.1 L400,33.7 L408,32.9 L416,32.8 L424,33.4 L432,34.7 L440,36.5 L448,38.9 L456,41.7 L464,44.8 L472,47.9 L480,51.1 L488,54.2 L496,57.1 L504,59.6 L512,61.8 L520,63.7 L528,65.1 L536,66.1 L544,66.8 L552,67.3 L560,67.5 L568,67.7 L576,67.7 L584,67.8 L592,67.9 L600,68.1 L608,68.5 L616,68.9 L624,69.3 L632,69.7 L640,70.0 L640,70.0 L632,70.2 L624,70.6 L616,71.3 L608,72.2 L600,73.3 L592,74.6 L584,76.1 L576,77.6 L568,79.2 L560,80.6 L552,81.9 L544,83.0 L536,83.8 L528,84.3 L520,84.4 L512,84.2 L504,83.6 L496,82.8 L488,81.7 L480,80.6 L472,79.5 L464,78.5 L456,77.8 L448,77.5 L440,77.6 L432,78.2 L424,79.5 L416,81.3 L408,83.7 L400,86.6 L392,89.9 L384,93.5 L376,97.2 L368,101.0 L360,104.6 L352,107.9 L344,110.6 L336,112.8 L328,114.3 L320,114.9 L312,114.8 L304,113.9 L296,112.1 L288,109.8 L280,106.8 L272,103.4 L264,99.7 L256,95.9 L248,92.2 L240,88.7 L232,85.5 L224,82.7 L216,80.5 L208,78.9 L200,77.8 L192,77.3 L184,77.3 L176,77.7 L168,78.4 L160,79.3 L152,80.4 L144,81.4 L136,82.3 L128,83.0 L120,83.4 L112,83.4 L104,83.1 L96,82.5 L88,81.6 L80,80.5 L72,79.2 L64,77.7 L56,76.2 L48,74.8 L40,73.5 L32,72.3 L24,71.4 L16,70.7 L8,70.2 L0,70.0 Z"/><path d="M0,70.0 L8,69.9 L16,69.7 L24,69.3 L32,68.8 L40,68.0 L48,67.0 L56,65.7 L64,64.2 L72,62.5 L80,60.7 L88,58.7 L96,56.7 L104,54.8 L112,53.0 L120,51.5 L128,50.3 L136,49.6 L144,49.3 L152,49.4 L160,50.0 L168,50.9 L176,52.3 L184,53.8 L192,55.5 L200,57.2 L208,58.7 L216,60.0 L224,60.9 L232,61.3 L240,61.1 L248,60.2 L256,58.8 L264,56.7 L272,54.0 L280,50.9 L288,47.5 L296,43.8 L304,40.2 L312,36.6 L320,33.4 L328,30.6 L336,28.4 L344,26.9 L352,26.2 L360,26.3 L368,27.2 L376,28.8 L384,31.1 L392,33.9 L400,37.2 L408,40.8 L416,44.5 L424,48.1 L432,51.6 L440,54.8 L448,57.7 L456,60.0 L464,61.8 L472,63.2 L480,64.0 L488,64.4 L496,64.4 L504,64.1 L512,63.7 L520,63.1 L528,62.6 L536,62.2 L544,61.9 L552,61.9 L560,62.1 L568,62.6 L576,63.2 L584,64.1 L592,65.1 L600,66.2 L608,67.2 L616,68.2 L624,69.0 L632,69.7 L640,70.0 L640,70.0 L632,70.1 L624,70.2 L616,70.4 L608,70.7 L600,71.1 L592,71.7 L584,72.5 L576,73.5 L568,74.9 L560,76.5 L552,78.4 L544,80.5 L536,82.8 L528,85.2 L520,87.5 L512,89.8 L504,91.8 L496,93.5 L488,94.9 L480,95.7 L472,96.0 L464,95.8 L456,95.1 L448,93.8 L440,92.2 L432,90.3 L424,88.2 L416,86.0 L408,83.9 L400,82.1 L392,80.7 L384,79.8 L376,79.5 L368,79.8 L360,80.8 L352,82.4 L344,84.6 L336,87.4 L328,90.5 L320,93.9 L312,97.4 L304,100.8 L296,104.0 L288,106.8 L280,109.0 L272,110.6 L264,111.4 L256,111.5 L248,110.9 L240,109.5 L232,107.4 L224,104.8 L216,101.8 L208,98.4 L200,94.9 L192,91.4 L184,88.0 L176,84.8 L168,82.0 L160,79.6 L152,77.7 L144,76.2 L136,75.2 L128,74.5 L120,74.2 L112,74.2 L104,74.3 L96,74.5 L88,74.7 L80,74.8 L72,74.9 L64,74.7 L56,74.4 L48,73.9 L40,73.2 L32,72.5 L24,71.7 L16,71.0 L8,70.3 L0,70.0 Z"/><path d="M0,70.0 L8,69.7 L16,69.1 L24,68.3 L32,67.3 L40,66.1 L48,64.9 L56,63.7 L64,62.6 L72,61.6 L80,60.9 L88,60.3 L96,60.1 L104,60.1 L112,60.4 L120,60.9 L128,61.6 L136,62.3 L144,63.0 L152,63.5 L160,63.8 L168,63.7 L176,63.2 L184,62.2 L192,60.7 L200,58.6 L208,56.0 L216,53.0 L224,49.6 L232,45.9 L240,42.2 L248,38.5 L256,35.0 L264,31.8 L272,29.2 L280,27.2 L288,26.0 L296,25.5 L304,25.8 L312,27.0 L320,28.9 L328,31.4 L336,34.4 L344,37.9 L352,41.6 L360,45.3 L368,48.9 L376,52.3 L384,55.3 L392,57.7 L400,59.6 L408,60.9 L416,61.6 L424,61.6 L432,61.2 L440,60.3 L448,59.1 L456,57.7 L464,56.2 L472,54.8 L480,53.5 L488,52.5 L496,51.9 L504,51.6 L512,51.8 L520,52.4 L528,53.4 L536,54.7 L544,56.2 L552,58.0 L560,59.8 L568,61.6 L576,63.3 L584,64.9 L592,66.3 L600,67.5 L608,68.4 L616,69.1 L624,69.6 L632,69.9 L640,70.0 L640,70.0 L632,70.3 L624,70.7 L616,71.1 L608,71.5 L600,71.7 L592,71.9 L584,72.1 L576,72.1 L568,72.2 L560,72.4 L552,72.7 L544,73.3 L536,74.1 L528,75.3 L520,76.8 L512,78.7 L504,81.0 L496,83.7 L488,86.6 L480,89.7 L472,92.9 L464,96.0 L456,98.9 L448,101.6 L440,103.8 L432,105.4 L424,106.5 L416,106.8 L408,106.5 L400,105.5 L392,103.8 L384,101.6 L376,99.0 L368,96.0 L360,92.9 L352,89.9 L344,87.0 L336,84.5 L328,82.5 L320,81.0 L312,80.1 L304,80.0 L296,80.5 L288,81.7 L280,83.5 L272,85.7 L264,88.2 L256,90.9 L248,93.7 L240,96.3 L232,98.6 L224,100.5 L216,101.9 L208,102.7 L200,102.9 L192,102.4 L184,101.3 L176,99.7 L168,97.6 L160,95.1 L152,92.4 L144,89.5 L136,86.6 L128,83.9 L120,81.3 L112,79.0 L104,76.9 L96,75.3 L88,74.0 L80,73.0 L72,72.2 L64,71.7 L56,71.4 L48,71.2 L40,71.0 L32,70.9 L24,70.7 L16,70.4 L8,70.2 L0,70.0 Z"/><path d="M0,70.0 L8,69.7 L16,69.2 L24,68.6 L32,68.1 L40,67.6 L48,67.3 L56,67.1 L64,67.0 L72,67.0 L80,67.0 L88,67.0 L96,66.9 L104,66.6 L112,66.0 L120,65.1 L128,63.9 L136,62.2 L144,60.1 L152,57.6 L160,54.7 L168,51.6 L176,48.3 L184,45.0 L192,41.7 L200,38.7 L208,36.0 L216,33.8 L224,32.2 L232,31.2 L240,31.0 L248,31.5 L256,32.7 L264,34.5 L272,37.0 L280,39.8 L288,42.9 L296,46.2 L304,49.4 L312,52.4 L320,55.1 L328,57.3 L336,58.9 L344,59.9 L352,60.2 L360,59.8 L368,58.7 L376,57.2 L384,55.1 L392,52.8 L400,50.3 L408,47.8 L416,45.5 L424,43.4 L432,41.7 L440,40.6 L448,40.0 L456,40.0 L464,40.6 L472,41.7 L480,43.4 L488,45.4 L496,47.8 L504,50.4 L512,53.0 L520,55.7 L528,58.2 L536,60.6 L544,62.6 L552,64.4 L560,65.8 L568,67.0 L576,67.8 L584,68.4 L592,68.8 L600,69.1 L608,69.3 L616,69.5 L624,69.7 L632,69.9 L640,70.0 L640,70.0 L632,70.3 L624,71.0 L616,71.8 L608,72.8 L600,73.8 L592,74.8 L584,75.8 L576,76.6 L568,77.2 L560,77.6 L552,77.7 L544,77.6 L536,77.3 L528,76.9 L520,76.4 L512,75.9 L504,75.6 L496,75.4 L488,75.6 L480,76.1 L472,77.2 L464,78.7 L456,80.7 L448,83.2 L440,86.2 L432,89.5 L424,93.0 L416,96.7 L408,100.4 L400,103.9 L392,107.0 L384,109.6 L376,111.7 L368,113.0 L360,113.6 L352,113.4 L344,112.4 L336,110.7 L328,108.3 L320,105.3 L312,102.0 L304,98.4 L296,94.7 L288,91.2 L280,87.8 L272,84.9 L264,82.5 L256,80.7 L248,79.4 L240,78.9 L232,78.9 L224,79.5 L216,80.6 L208,82.1 L200,83.7 L192,85.5 L184,87.2 L176,88.7 L168,89.9 L160,90.8 L152,91.3 L144,91.3 L136,90.8 L128,89.9 L120,88.6 L112,87.0 L104,85.1 L96,83.1 L88,81.1 L80,79.1 L72,77.2 L64,75.5 L56,74.0 L48,72.8 L40,71.9 L32,71.1 L24,70.6 L16,70.3 L8,70.1 L0,70.0 Z"/></svg></div>
+          <button id="legend-button" type="button" aria-describedby="legend-voice-status">Play legend</button>
+          <label class="legend-language">Narration language
+            <select id="legend-language">
+              <option value="en-IN">English</option><option value="hi-IN">हिन्दी · Hindi</option>
+              <option value="bn-IN">বাংলা · Bengali</option><option value="gu-IN">ગુજરાતી · Gujarati</option>
+              <option value="kn-IN">ಕನ್ನಡ · Kannada</option><option value="ml-IN">മലയാളം · Malayalam</option>
+              <option value="mr-IN">मराठी · Marathi</option><option value="od-IN">ଓଡ଼ିଆ · Odia</option>
+              <option value="pa-IN">ਪੰਜਾਬੀ · Punjabi</option><option value="ta-IN">தமிழ் · Tamil</option>
+              <option value="te-IN">తెలుగు · Telugu</option>
+            </select>
+          </label>
+          <p id="legend-voice-status" role="status"></p>
+          <label class="legend-first"><input id="legend-first" type="checkbox" checked> Hear the legend before playback</label>
+        </section>
+        <section id="readout" class="panel info readout" aria-label="Dataset readout"><h3 id="readout-heading">Live readout</h3><div id="readout-value"></div><ol id="readout-timeline" aria-label="Recent readings"></ol></section>
+        <section class="panel info mapping-notes">
+          <h3>How we mapped it</h3><p id="mapping"></p>
+          <a id="source">NASA visualization ↗</a>
+        </section>
+      </aside>
+    </div>
+    <section id="symphony" hidden aria-labelledby="symphony-title">
+      <div class="symphony-heading">
+        <div><p class="eyebrow">Earth observation · Mix</p><h2 id="symphony-title">Planet Symphony</h2></div>
+        <a href="#play">← Back to Jukebox</a>
+      </div>
+      <div id="tiles" class="tiles"></div>
+      <div id="symphony-controls" class="panel controls"></div>
+    </section>
   </main>
-
-  <footer class="site-footer">
-    <p>Visualizations: <a href="https://svs.gsfc.nasa.gov/">NASA Scientific Visualization Studio</a>.
-       Built for the NASA Space Apps Challenge 2026.</p>
-  </footer>
-
-  <!-- Screen-reader announcements (written by js/a11y.js) -->
-  <div id="live" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+  <footer class="shell footer"><span>NASA Space Apps Challenge 2026</span><a href="https://svs.gsfc.nasa.gov/">NASA Scientific Visualization Studio ↗</a></footer>
+  <dialog id="play-dialog" aria-labelledby="play-dialog-title">
+    <div class="dialog-heading">
+      <h2 id="play-dialog-title"></h2>
+      <form method="dialog"><button autofocus aria-label="Close dialog">×</button></form>
+    </div>
+    <div id="play-dialog-content"></div>
+  </dialog>
+  <div id="live" role="status" class="sr-only"></div>
 </body>
 </html>

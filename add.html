@@ -1,0 +1,159 @@
+<!doctype html>
+<!-- Owner: Freia · Support: Aahana, Hazel -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Add a Visualization · Earth Jukebox</title>
+  <meta name="description" content="Turn any NASA Earth visualization into sound: mark the map and colour bar, then hear it and download its config.">
+  <link rel="icon" type="image/svg+xml" href="media/rocket-cursor.svg">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Page-only additions on top of the shared styles in css/style.css */
+    .add-heading > div > p:first-child { border-left: 1px solid #56585d; padding-left: 1rem; color: var(--muted); }
+    .add-heading .row-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .75rem; }
+    .step-status { margin: .5rem 0 0; font-size: .9rem; color: #c8f2e8; }
+    .step-status:empty { display: none; }
+    .step-status.step-error { color: #ffb4a8; }
+  </style>
+  <script type="module" src="js/add.js"></script>
+  <script type="module">
+    import { bindNavigation } from './js/navigation.js';
+    bindNavigation();
+  </script>
+</head>
+<body class="add-page">
+  <a class="skip" href="#steps">Skip to the steps</a>
+  <header class="shell header">
+    <a class="brand" href="index.html#home"><span class="brand-icon" aria-hidden="true"></span><span>EARTH<br>JUKEBOX</span></a>
+    <nav id="site-navigation" aria-label="Studio views">
+      <a href="index.html#home">Home</a>
+      <a href="index.html#play">Play</a>
+      <a href="index.html#explore">Explore</a>
+      <a href="index.html#symphony">Planet Symphony</a>
+      <a href="add.html" aria-current="page">Add visualization</a>
+    </nav>
+    <button id="menu-toggle" aria-controls="site-navigation" aria-expanded="false" aria-label="Toggle navigation">☰</button>
+  </header>
+  <main class="shell add-workspace">
+    <div class="add-heading">
+      <div><p class="eyebrow">Earth observation · Setup</p><h1>Add a visualization</h1></div>
+      <div>
+        <p>Turn a NASA Earth visualization with a colour bar into music. Follow the five steps, or try
+          the ready-made example first.</p>
+        <div class="row-buttons">
+          <button id="example" type="button">Try with an example</button>
+          <a href="index.html#play">Back to the jukebox</a>
+        </div>
+        <p id="status-0" class="step-status"></p>
+      </div>
+    </div>
+    <div class="add-layout">
+    <section class="panel" aria-labelledby="preview-heading">
+      <h2 id="preview-heading">Preview</h2>
+      <div class="stage">
+        <video id="video" muted playsinline loop aria-hidden="true"></video>
+        <canvas id="overlay" class="overlay" width="1280" height="720" role="img"
+                aria-label="Preview of your visualization with the map box and colour bar line drawn on it."></canvas>
+        <p id="empty" class="player-message">Choose a video or image in step 1.</p>
+      </div>
+      <p id="check" class="readout" aria-live="polite"></p>
+    </section>
+
+    <section id="steps" class="panel" aria-labelledby="steps-heading" tabindex="-1">
+      <h2 id="steps-heading">Steps</h2>
+
+      <fieldset>
+        <legend>1. Load an image or video</legend>
+        <div class="fields">
+          <label>Video or image file <input id="file" type="file" accept="video/*,image/*"></label>
+          <label>Title <input id="title" type="text" value="My visualization"></label>
+          <label>Source page <input id="source" type="url" placeholder="https://svs.gsfc.nasa.gov/..."></label>
+        </div>
+        <p id="status-1" class="step-status"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>2. Drag a box over the map</legend>
+        <p class="step-help">Press "Draw the map box", then drag over the map on the preview. Or type the
+          numbers (in pixels of the picture).</p>
+        <div class="row-buttons"><button id="pick-box" type="button" aria-pressed="false">Draw the map box</button></div>
+        <div class="fields">
+          <label>Left <input id="cx" type="number" min="0" value="0"></label>
+          <label>Top <input id="cy" type="number" min="0" value="0"></label>
+          <label>Width <input id="cw" type="number" min="1" value="1280"></label>
+          <label>Height <input id="ch" type="number" min="1" value="720"></label>
+        </div>
+        <p id="status-2" class="step-status"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>3. Mark the colour bar and its values</legend>
+        <p class="step-help">Press the button, then click the low end of the colour bar and then the high
+          end. Type the value and unit printed at each end, then press "Read the colour bar".</p>
+        <div class="row-buttons"><button id="pick-bar" type="button" aria-pressed="false">Click the two ends of the colour bar</button></div>
+        <div class="fields">
+          <label>Low end x <input id="bx1" type="number" value="0"></label>
+          <label>Low end y <input id="by1" type="number" value="0"></label>
+          <label>High end x <input id="bx2" type="number" value="0"></label>
+          <label>High end y <input id="by2" type="number" value="0"></label>
+          <label>Value at low end <input id="vmin" type="number" step="any" value="0"></label>
+          <label>Value at high end <input id="vmax" type="number" step="any" value="30"></label>
+          <label>Unit <input id="unit" type="text" value="°C"></label>
+          <label>Colour tolerance <input id="maxdist" type="number" min="5" max="200" value="60"></label>
+        </div>
+        <div class="row-buttons"><button id="sample" type="button">Read the colour bar</button></div>
+        <div id="gradient" class="gradient" aria-hidden="true"></div>
+        <p id="stops-text" class="readout"></p>
+        <p id="status-3" class="step-status"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>4. Pick a sound and play</legend>
+        <div class="fields">
+          <label>Kind of data
+            <select id="mapper">
+              <option value="continuousField">Smooth field (temperature, height): held chord</option>
+              <option value="density">Amount or brightness (lights, cover): sparkles</option>
+            </select>
+          </label>
+          <label>Instrument
+            <select id="instrument">
+              <option value="warmPad">Warm pad</option>
+              <option value="glass">Glass bells</option>
+              <option value="dust">Low drone</option>
+              <option value="salt">Airy shimmer</option>
+            </select>
+          </label>
+          <label>Scale
+            <select id="scale">
+              <option>C major pentatonic</option>
+              <option>A minor pentatonic</option>
+              <option>C minor pentatonic</option>
+            </select>
+          </label>
+        </div>
+        <div class="row-buttons">
+          <button id="play" type="button">Play</button>
+          <button id="stop" type="button">Stop</button>
+        </div>
+        <p class="step-help">Escape also stops the sound.</p>
+        <p id="status-4" class="step-status"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>5. Download the config</legend>
+        <p class="step-help">Download the config, save it in <code>datasets/</code>, add its name to
+          <code>datasets/index.json</code> and put the video in <code>media/</code>. It then shows up in the jukebox.</p>
+        <div class="row-buttons"><button id="download" type="button">Download config</button></div>
+        <p id="status-5" class="step-status"></p>
+        <label for="json" class="sr-only">Config JSON</label>
+        <textarea id="json" readonly></textarea>
+      </fieldset>
+    </section>
+    </div>
+  </main>
+
+  <div id="live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

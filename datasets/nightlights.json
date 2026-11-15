@@ -2,33 +2,173 @@
   "id": "nightlights",
   "title": "Night Lights 2012–2023",
   "source": "https://svs.gsfc.nasa.gov/5313/",
-  "video": "media/nightlights.mp4",
+  "video": "media/nightlights_web.mp4",
   "dates": "2012–2023",
   "description": "Earth's city lights at night, year by year. Brighter areas mean more light from towns and cities.",
-  "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
-  "grid": { "w": 32, "h": 16 },
+  "crop": {
+    "x": 0,
+    "y": 20,
+    "w": 960,
+    "h": 520
+  },
+  "grid": {
+    "w": 32,
+    "h": 16
+  },
+  "masks": [
+    {
+      "x": 990,
+      "y": 246,
+      "w": 56,
+      "h": 24
+    }
+  ],
+  "segments": [
+    {
+      "from": 0,
+      "to": 9.42,
+      "mode": "annual"
+    },
+    {
+      "from": 21.26,
+      "to": 36.59,
+      "mode": "annual",
+      "masks": [
+        {
+          "x": 170,
+          "y": 166,
+          "w": 329,
+          "h": 329,
+          "note": "Western Europe panel; frame borders x 170/498, y 186/514 (mask y is crop-relative: frame y - 20)"
+        },
+        {
+          "x": 419,
+          "y": 78,
+          "w": 67,
+          "h": 2,
+          "note": "W. Europe source-box fence, top edge (frame y 98)"
+        },
+        {
+          "x": 419,
+          "y": 144,
+          "w": 67,
+          "h": 2,
+          "note": "W. Europe source-box fence, bottom edge (frame y 164)"
+        },
+        {
+          "x": 419,
+          "y": 78,
+          "w": 2,
+          "h": 68,
+          "note": "W. Europe source-box fence, left edge (frame x 419)"
+        },
+        {
+          "x": 484,
+          "y": 78,
+          "w": 2,
+          "h": 68,
+          "note": "W. Europe source-box fence, right edge (frame x 485)"
+        },
+        {
+          "x": 188,
+          "y": 140,
+          "w": 232,
+          "h": 26,
+          "note": "W. Europe callout beam, lower edge band (frame x 188-419, y 160-185)"
+        },
+        {
+          "x": 592,
+          "y": 12,
+          "w": 215,
+          "h": 286,
+          "note": "Eastern Mediterranean panel; frame borders x 592/806, y 32/317"
+        },
+        {
+          "x": 522,
+          "y": 128,
+          "w": 37,
+          "h": 2,
+          "note": "E. Mediterranean source-box fence, top edge (frame y 148)"
+        },
+        {
+          "x": 522,
+          "y": 178,
+          "w": 37,
+          "h": 2,
+          "note": "E. Mediterranean source-box fence, bottom edge (frame y 198)"
+        },
+        {
+          "x": 522,
+          "y": 128,
+          "w": 2,
+          "h": 52,
+          "note": "E. Mediterranean source-box fence, left edge (frame x 522)"
+        },
+        {
+          "x": 557,
+          "y": 128,
+          "w": 2,
+          "h": 52,
+          "note": "E. Mediterranean source-box fence, right edge (frame x 558)"
+        },
+        {
+          "x": 565,
+          "y": 12,
+          "w": 28,
+          "h": 286,
+          "note": "E. Mediterranean callout beam edge along the panel border (frame x 565-592)"
+        }
+      ]
+    }
+  ],
+  "extract": {
+    "mode": "brightness",
+    "darkThreshold": 50,
+    "changeThreshold": 5
+  },
   "colorbar": {
-    "unit": "nW/cm²/sr",
+    "unit": "brightness index",
     "stops": [
-      { "rgb": [0, 0, 0], "value": 0 },
-      { "rgb": [255, 230, 150], "value": 100 }
+      {
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "value": 0
+      },
+      {
+        "rgb": [
+          255,
+          230,
+          150
+        ],
+        "value": 100
+      }
     ],
     "maxDist": 60
   },
   "sound": {
     "mapper": "density",
     "scale": "C major pentatonic",
-    "octaves": [4, 6],
     "instrument": "glass",
     "valueTo": "note density",
     "changeTo": "sparkle",
-    "maxVoices": 8,
-    "smoothFrames": 2,
-    "tensionAbove": 80
+    "legendExamples": [
+      { "values": [40, 55, 70, 85, 60, 45] },
+      { "values": [20, 100] }
+    ]
   },
   "legend": [
-    { "sound": "more sparkling notes", "means": "more lit-up area" },
-    { "sound": "higher notes", "means": "brighter lights" }
+    {
+      "sound": "more sparkling notes",
+      "means": "more lit-up area"
+    },
+    {
+      "sound": "higher notes",
+      "means": "brighter lights"
+    }
   ],
+  "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
   "_todo": "Aahana: measure crop box, sample real colorbar stops and units from SVS page. Freia: tune sound block."
 }

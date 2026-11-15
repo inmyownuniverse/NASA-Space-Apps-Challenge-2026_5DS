@@ -7,5 +7,15 @@ __pycache__/
 *.wav
 *.webm
 tools/*.png
+
+# Night Lights 8K master: kept locally, the app uses media/nightlights_web.mp4
+media/nightlights.mp4
 .vscode/*
 !.vscode/extensions.json
+
+# Local API credentials
+.env
+.env.*
+/env
+/env (*)
+*.env

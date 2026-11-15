@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sound Lab</title>
+<!-- Owner: Freia · Support: Jaden -->
+<!-- Dev-only page for hearing and tuning the sound engine without the analyser or the UI.
+     Not linked from the main app. Open it through a local server, e.g. Live Server:
+     http://127.0.0.1:5500/tools/sound-lab.html -->
+<style>
+  :root { --bg: #0f1420; --panel: #1a2133; --line: #2c3650; --text: #e8ecf5; --muted: #9aa6c0; --accent: #5ec8ff; --hot: #ffb347; --stop: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  h2 { margin: 0 0 8px; font-size: 17px; }
+  h3 { margin: 12px 0 6px; font-size: 14px; color: var(--muted); }
+  p.note { margin: 0 0 12px; color: var(--muted); }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  button { background: #26314a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.on { background: var(--accent); color: #001; }
+  button.big { font-size: 17px; padding: 10px 18px; }
+  button.stop { background: var(--stop); color: #200; font-weight: 600; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--hot); outline-offset: 2px; }
+  label.row { display: grid; grid-template-columns: 130px 1fr 64px; gap: 8px; align-items: center; margin: 4px 0; }
+  label.row output { text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; }
+  .readout { margin-top: 8px; padding: 6px 8px; background: #0b0f18; border-radius: 6px; font: 12px/1.4 ui-monospace, monospace; color: var(--muted); white-space: pre-wrap; min-height: 2.8em; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+  .legend { list-style: none; padding: 0; margin: 0; }
+  .legend li { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+  .cols { display: grid; grid-template-columns: repeat(32, 1fr); gap: 2px; margin: 10px 0; }
+  .cols div { height: 22px; background: #26314a; border-radius: 2px; }
+  .cols div.lit { background: var(--hot); }
+  #status { color: var(--muted); }
+  #meter { font: 13px ui-monospace, monospace; min-width: 190px; }
+  #meter.hot { color: var(--stop); font-weight: 700; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--accent); }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 6px 0; padding: 4px 8px; }
+  legend { color: var(--muted); font-size: 13px; }
+  label.tune { display: grid; grid-template-columns: 1fr 110px; gap: 8px; align-items: center; margin: 2px 0; font-size: 13px; }
+  label.tune input { width: 100%; background: #0b0f18; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font: inherit; }
+  label.tune.changed span { color: var(--hot); }
+  textarea { width: 100%; min-height: 160px; background: #0b0f18; color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: 12px/1.4 ui-monospace, monospace; }
+  @media (max-width: 500px) { label.row { grid-template-columns: 100px 1fr 54px; } }
+</style>
+</head>
+<body>
+<h1>Sound Lab</h1>
+<p class="note">Dev page for tuning the Earth Jukebox sound. Fake data only, no video. Use headphones.</p>
+
+<div class="bar">
+  <button id="start" class="big">Start audio</button>
+  <label class="row" style="min-width:300px;margin:0">Master volume <input id="master" type="range" min="-40" max="0" step="1" value="-8"> <output id="master-out">-8 dB</output></label>
+  <button id="stop-all" class="big stop" disabled>Stop all</button>
+  <span id="meter" title="Loudness of the final mix. The limiter keeps it under the master limiter setting.">Output: off</span>
+  <span id="status" role="status">Audio is off. Press "Start audio" first.</span>
+</div>
+
+<div class="grid" id="datasets"></div>
+
+<div class="grid" style="margin-top:12px">
+  <section>
+    <h2>Scan mode</h2>
+    <label class="row">Dataset <select id="scan-ds"></select><span></span></label>
+    <div class="buttons"><button id="scan-start" disabled>Start scan</button><button id="scan-stop" disabled>Stop scan</button></div>
+    <div class="cols" id="scan-cols" aria-hidden="true"></div>
+    <div class="readout" id="scan-readout">Uses the selected dataset's sliders above.</div>
+  </section>
+
+  <section>
+    <h2>Planet Symphony</h2>
+    <div class="buttons"><button id="sym-start" disabled>Start symphony</button><button id="sym-stop" disabled>Stop symphony</button></div>
+    <h3>Level per dataset (dB)</h3>
+    <div id="sym-levels"></div>
+    <div class="readout" id="sym-readout">All four datasets play together, each from its own sliders above. These level sliders change symphonyLevel in the tuning.</div>
+  </section>
+
+  <section>
+    <h2>Shared tuning</h2>
+    <p class="note">Master, Scan and Legend settings from js/sound/tuning.js. Changes apply straight away.</p>
+    <div id="shared-tuning"></div>
+  </section>
+
+  <section>
+    <h2>Copy current settings</h2>
+    <p class="note">Copies all settings as JSON. The list under it shows only what you changed, so you can edit those values in js/sound/tuning.js and keep its comments.</p>
+    <div class="buttons"><button id="copy">Copy current settings</button><button id="reset-tuning">Undo all changes</button></div>
+    <h3>Changed since the page opened</h3>
+    <div class="readout" id="changed">Nothing changed yet.</div>
+    <h3>All settings (JSON)</h3>
+    <textarea id="json" readonly aria-label="All settings as JSON"></textarea>
+  </section>
+</div>
+
+<script type="module">
+import * as engine from '../js/sound/engine.js';
+import { valueRange } from '../js/sound/scales.js';
+import { TUNING, tuned, tuningChanged } from '../js/sound/tuning.js';
+
+const TICK = 0.25;            // seconds between fake frames, same as the player
+const GW = 32, GH = 16;       // grid size used by every dataset
+const $ = (id) => document.getElementById(id);
+
+let audioOn = false;
+let cfgs = [];                // dataset configs, in index.json order
+const ctl = {};               // per dataset: current slider values
+const pattern = {};           // per dataset: fixed 0..1 "landscape" so the grid is not pure noise
+let playing = null;           // { id, timer } while one dataset is in Play
+let loadedId = null;          // dataset whose voice is loaded in the engine (null in symphony)
+let symTimer = null;
+let scanning = false;
+const flashQueue = {};        // extra flashes from "Flash now", sent on the next tick
+let scanId = null;            // dataset being scanned
+const ORIGINAL = JSON.parse(JSON.stringify(TUNING)); // to list what changed and to undo
+const editors = [];           // { input, row, path, get } for every tuning field
+
+// ---------- fake features ----------
+
+function makePattern() {
+  const p = [];
+  const a = Math.random() * 6, b = Math.random() * 6, c = Math.random() * 6;
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const v = 0.5 + 0.25 * Math.sin(x / 4 + a) + 0.15 * Math.sin(y / 2.5 + b) + 0.1 * Math.sin((x + y) / 3 + c);
+      p.push(Math.min(1, Math.max(0, v)));
+    }
+  }
+  return p;
+}
+
+/** Build a features object (same shape as analyzer.analyze) from the sliders. */
+function buildFeatures(id) {
+  const c = ctl[id];
+  const lo = Math.min(c.spreadMin, c.spreadMax), hi = Math.max(c.spreadMin, c.spreadMax);
+  const grid = pattern[id].map((p) => lo + p * (hi - lo) + (Math.random() - 0.5) * 0.04 * (hi - lo));
+  const columns = [];
+  for (let x = 0; x < GW; x++) {
+    let s = 0;
+    for (let y = 0; y < GH; y++) s += grid[y * GW + x];
+    columns.push(s / GH);
+  }
+  const [vMin, vMax] = valueRange(cfgById(id));
+  const flashes = [];
+  for (let i = 0; i < (c.flashes ?? 0); i++) {
+    flashes.push({ x: Math.floor(Math.random() * GW), y: Math.floor(Math.random() * GH), value: vMin + (0.4 + 0.6 * Math.random()) * (vMax - vMin) });
+  }
+  if (flashQueue[id]?.length) flashes.push(...flashQueue[id].splice(0));
+  const layers = c.layers ? Object.fromEntries(Object.entries(c.layers).map(([k, v]) => [k, v / 100])) : {};
+  return { grid, mean: c.mean, max: c.max, columns, flashes, change: c.change, layers };
+}
+
+const cfgById = (id) => cfgs.find((c) => c.id === id);
+const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(2));
+
+function showReadout(id, f) {
+  const c = ctl[id];
+  let text = `mean ${fmt(f.mean)}  max ${fmt(f.max)}  change ${f.change.toFixed(2)}\ngrid spread ${fmt(c.spreadMin)} to ${fmt(c.spreadMax)}`;
+  if (c.flashes !== undefined) text += `\nflashes this tick ${f.flashes.length}`;
+  if (c.layers) text += '\nlayers ' + Object.entries(f.layers).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join('  ');
+  $(`ro-${id}`).textContent = text;
+}
+
+// ---------- engine helpers ----------
+
+function ensureLoaded(id) {
+  if (loadedId === id) return;
+  engine.loadDataset(cfgById(id));
+  loadedId = id;
+}
+
+function stopPlay() {
+  if (!playing) return;
+  clearInterval(playing.timer);
+  $(`play-${playing.id}`).classList.remove('on');
+  playing = null;
+}
+function stopScan() {
+  engine.stopScan();
+  scanning = false;
+  $('scan-start').classList.remove('on');
+  document.querySelectorAll('#scan-cols div').forEach((d) => d.classList.remove('lit'));
+}
+function stopSymphony() {
+  if (symTimer) clearInterval(symTimer);
+  symTimer = null;
+  $('sym-start').classList.remove('on');
+}
+function stopAll() {
+  stopPlay(); stopScan(); stopSymphony();
+  engine.releaseAll();
+  setStatus('Stopped.');
+}
+const setStatus = (t) => { $('status').textContent = t; };
+
+function play(id) {
+  stopAll();
+  ensureLoaded(id);
+  const cfg = cfgById(id);
+  const tick = () => {
+    const f = buildFeatures(id);
+    engine.playFrame(f, cfg, 0);
+    showReadout(id, f);
+  };
+  tick();
+  playing = { id, timer: setInterval(tick, TICK * 1000) };
+  $(`play-${id}`).classList.add('on');
+  setStatus(`Playing ${cfg.title}.`);
+}
+
+// ---------- tuning ----------
+
+let retuneTimer = null;
+function scheduleRetune() {
+  clearTimeout(retuneTimer);
+  retuneTimer = setTimeout(() => {
+    if (!audioOn) { tuningChanged(); showChanges(); return; }
+    const scanAgain = scanning ? scanId : null;
+    engine.retune();          // rebuilds instruments; this stops Scan mode
+    if (scanAgain) startScanFor(scanAgain);
+    showChanges();
+  }, 250);
+}
+
+const getPath = (obj, path) => path.reduce((o, k) => o?.[k], obj);
+
+function tuneField(parent, label, holder, key, path) {
+  const value = holder[key];
+  const row = document.createElement('label');
+  row.className = 'tune';
+  const input = document.createElement('input');
+  if (typeof value === 'boolean') { input.type = 'checkbox'; input.checked = value; }
+  else if (typeof value === 'number') { input.type = 'number'; input.step = 'any'; input.value = value; }
+  else { input.type = 'text'; input.value = value; }
+  const span = document.createElement('span');
+  span.textContent = label;
+  row.append(span, input);
+  input.addEventListener(input.type === 'checkbox' ? 'change' : 'input', () => {
+    const v = input.type === 'checkbox' ? input.checked : input.type === 'number' ? Number(input.value) : input.value;
+    if (input.type === 'number' && (input.value === '' || !Number.isFinite(v))) return;
+    holder[key] = v;
+    if (path[0] === 'datasets' && path[2] === 'symphonyLevel') syncSymphonySliders();
+    scheduleRetune();
+  });
+  parent.appendChild(row);
+  editors.push({ input, row, path, get: () => holder[key] });
+}
+
+/** One input per setting, nested objects in fieldsets, [low, high] pairs as two inputs. */
+function buildEditor(parent, obj, path) {
+  for (const [k, v] of Object.entries(obj)) {
+    const p = [...path, k];
+    if (Array.isArray(v)) {
+      v.forEach((_, i) => tuneField(parent, `${k} ${['low', 'high'][i] ?? i}`, v, i, [...p, i]));
+    } else if (v && typeof v === 'object') {
+      const fs = document.createElement('fieldset');
+      fs.innerHTML = `<legend>${k}</legend>`;
+      parent.appendChild(fs);
+      buildEditor(fs, v, p);
+    } else {
+      tuneField(parent, k, obj, k, p);
+    }
+  }
+}
+
+function refreshEditors() {
+  for (const e of editors) {
+    if (document.activeElement === e.input) continue;
+    const v = e.get();
+    if (e.input.type === 'checkbox') e.input.checked = v; else e.input.value = v;
+  }
+}
+
+function changes() {
+  const out = [];
+  for (const e of editors) {
+    const was = getPath(ORIGINAL, e.path), now = e.get();
+    const changed = was !== now;
+    e.row.classList.toggle('changed', changed);
+    if (changed) out.push(`${e.path.join('.')}: ${JSON.stringify(was)} to ${JSON.stringify(now)}`);
+  }
+  return out;
+}
+
+function showChanges() {
+  const list = changes();
+  $('changed').textContent = list.length ? list.join('\n') : 'Nothing changed yet.';
+  $('json').value = JSON.stringify(TUNING, null, 2);
+}
+
+/** Put every edited value back, keeping the same objects so the editors stay connected. */
+function restore(target, source) {
+  for (const [k, v] of Object.entries(source)) {
+    if (v && typeof v === 'object' && target[k] && typeof target[k] === 'object') restore(target[k], v);
+    else target[k] = v;
+  }
+}
+
+function resetTuning() {
+  restore(TUNING, JSON.parse(JSON.stringify(ORIGINAL)));
+  refreshEditors();
+  syncSymphonySliders();
+  scheduleRetune();
+}
+
+// ---------- level meter ----------
+
+let peak = -Infinity, peakAt = 0;
+function meterLoop() {
+  const db = engine.outputLevel();
+  const now = performance.now();
+  if (db > peak || now - peakAt > 3000) { peak = db; peakAt = now; }
+  const f = (v) => (Number.isFinite(v) && v > -100 ? `${v.toFixed(0)} dB` : 'silent');
+  $('meter').textContent = `Output: ${f(db)} (peak ${f(peak)})`;
+  $('meter').classList.toggle('hot', peak > TUNING.master.limiter - 1);
+  requestAnimationFrame(meterLoop);
+}
+
+// ---------- UI building ----------
+
+function slider(parent, label, min, max, step, value, onInput, unit = '') {
+  const row = document.createElement('label');
+  row.className = 'row';
+  row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${value}"><output></output>`;
+  const input = row.querySelector('input'), out = row.querySelector('output');
+  const update = () => { const v = Number(input.value); out.textContent = fmt(v) + unit; onInput(v); };
+  input.addEventListener('input', update);
+  update();
+  parent.appendChild(row);
+  return input;
+}
+
+function buildDataset(cfg) {
+  const id = cfg.id;
+  const [vMin, vMax] = valueRange(cfg);
+  const span = vMax - vMin;
+  const step = span > 10 ? 0.5 : 0.01;
+  pattern[id] = makePattern();
+  ctl[id] = { mean: vMin + span * 0.5, max: vMin + span * 0.8, change: 0.1, spreadMin: vMin + span * 0.2, spreadMax: vMin + span * 0.8 };
+
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h2>${cfg.title} <small style="color:var(--muted)">(${id}, ${cfg.sound.mapper})</small></h2>
+    <div class="buttons"><button id="play-${id}" class="needs-audio" disabled>Play</button><button id="stop-${id}" class="needs-audio" disabled>Stop</button></div>
+    <h3>Fake data (${cfg.colorbar?.unit ?? 'value'})</h3><div class="sliders"></div>
+    <div class="readout" id="ro-${id}"></div>
+    <h3>Legend</h3><ul class="legend"></ul>`;
+  const s = sec.querySelector('.sliders');
+  slider(s, 'Mean value', vMin, vMax, step, ctl[id].mean, (v) => { ctl[id].mean = v; });
+  slider(s, 'Max value', vMin, vMax, step, ctl[id].max, (v) => { ctl[id].max = v; });
+  slider(s, 'Change', 0, 1, 0.01, ctl[id].change, (v) => { ctl[id].change = v; });
+  slider(s, 'Spread min', vMin, vMax, step, ctl[id].spreadMin, (v) => { ctl[id].spreadMin = v; });
+  slider(s, 'Spread max', vMin, vMax, step, ctl[id].spreadMax, (v) => { ctl[id].spreadMax = v; });
+
+  if (cfg.sound.mapper === 'events') {
+    ctl[id].flashes = 1;
+    slider(s, 'Flashes per tick', 0, 8, 1, 1, (v) => { ctl[id].flashes = v; });
+    const btn = document.createElement('button');
+    btn.textContent = 'Flash now';
+    btn.className = 'needs-audio';
+    btn.disabled = true;
+    btn.addEventListener('click', () => {
+      const flash = { x: Math.floor(Math.random() * GW), y: Math.floor(Math.random() * GH), value: vMax };
+      if (playing?.id === id || symTimer) { (flashQueue[id] ??= []).push(flash); return; }
+      stopAll();
+      ensureLoaded(id);
+      engine.playFrame({ ...buildFeatures(id), flashes: [flash] }, cfg, 0);
+      setStatus(`Flash at column ${flash.x}, row ${flash.y}.`);
+    });
+    sec.querySelector('.buttons').appendChild(btn);
+  }
+
+  if (cfg.sound.mapper === 'layers') {
+    ctl[id].layers = {};
+    for (const name of cfg.sound.instruments ?? []) {
+      ctl[id].layers[name] = 50;
+      slider(s, `Layer: ${name}`, 0, 100, 1, 50, (v) => { ctl[id].layers[name] = v; }, '%');
+    }
+  }
+
+  const ul = sec.querySelector('.legend');
+  (cfg.legend ?? []).forEach((line, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button class="needs-audio" disabled>Play ${i + 1}</button><span>${line.sound} = ${line.means}</span>`;
+    li.querySelector('button').addEventListener('click', () => {
+      stopAll();
+      ensureLoaded(id);
+      engine.playLegendSample(cfg, i);
+      setStatus(`Legend: ${line.sound} = ${line.means}.`);
+    });
+    ul.appendChild(li);
+  });
+
+  if (TUNING.datasets[id]) {
+    const det = document.createElement('details');
+    det.innerHTML = '<summary>Tuning settings (js/sound/tuning.js)</summary>';
+    buildEditor(det, TUNING.datasets[id], ['datasets', id]);
+    sec.appendChild(det);
+  }
+
+  $('datasets').appendChild(sec);
+  sec.querySelector(`#play-${id}`).addEventListener('click', () => play(id));
+  sec.querySelector(`#stop-${id}`).addEventListener('click', () => { stopPlay(); engine.releaseAll(); setStatus('Stopped.'); });
+  showReadout(id, buildFeatures(id));
+}
+
+function startScanFor(id) {
+  const boxes = [...$('scan-cols').children];
+  ensureLoaded(id);
+  engine.startScan(cfgById(id), () => buildFeatures(id), (col, notes) => {
+    boxes.forEach((b, i) => b.classList.toggle('lit', i === col));
+    $('scan-readout').textContent = `column ${col + 1} of ${GW}: ${notes.join(' ') || '(silent)'}`;
+  });
+  scanning = true;
+  scanId = id;
+  $('scan-start').classList.add('on');
+  setStatus(`Scanning ${cfgById(id).title}.`);
+}
+
+function buildScan() {
+  const sel = $('scan-ds');
+  for (const cfg of cfgs) sel.add(new Option(cfg.title, cfg.id));
+  for (let i = 0; i < GW; i++) $('scan-cols').appendChild(document.createElement('div'));
+
+  $('scan-start').addEventListener('click', () => { stopAll(); startScanFor(sel.value); });
+  $('scan-stop').addEventListener('click', () => { stopScan(); engine.releaseAll(); setStatus('Scan stopped.'); });
+}
+
+const symSliders = {};
+function syncSymphonySliders() {
+  for (const cfg of cfgs) {
+    const input = symSliders[cfg.id];
+    if (!input) continue;
+    input.value = tuned(cfg).sound.symphonyLevel;
+    input.nextElementSibling.textContent = `${input.value} dB`;
+    engine.setSymphonyLevel(cfg.id, Number(input.value));
+  }
+}
+
+function buildSymphony() {
+  const levels = $('sym-levels');
+  for (const cfg of cfgs) {
+    symSliders[cfg.id] = slider(levels, cfg.title, -40, 6, 1, tuned(cfg).sound.symphonyLevel ?? -6, (v) => {
+      if (TUNING.datasets[cfg.id]) TUNING.datasets[cfg.id].symphonyLevel = v;
+      tuningChanged();
+      engine.setSymphonyLevel(cfg.id, v);
+      if (editors.length) { refreshEditors(); showChanges(); }
+    }, ' dB');
+  }
+  $('sym-start').addEventListener('click', () => {
+    stopAll();
+    engine.loadSymphony(cfgs); // levels come from the tuning, which the sliders above edit
+    loadedId = null;
+    const tick = () => {
+      const byId = {};
+      for (const cfg of cfgs) byId[cfg.id] = buildFeatures(cfg.id);
+      engine.playSymphonyFrame(byId);
+      for (const cfg of cfgs) showReadout(cfg.id, byId[cfg.id]);
+    };
+    tick();
+    symTimer = setInterval(tick, TICK * 1000);
+    $('sym-start').classList.add('on');
+    setStatus('Planet Symphony playing.');
+  });
+  $('sym-stop').addEventListener('click', () => { stopSymphony(); engine.releaseAll(); setStatus('Symphony stopped.'); });
+}
+
+// ---------- start ----------
+
+async function loadConfigs() {
+  const files = await (await fetch('../datasets/index.json')).json();
+  return Promise.all(files.map(async (f) => (await fetch(`../datasets/${f}`)).json()));
+}
+
+$('start').addEventListener('click', async () => {
+  if (audioOn) return;
+  await engine.initAudio();
+  audioOn = true;
+  engine.setVolume(Number($('master').value));
+  requestAnimationFrame(meterLoop);
+  document.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  $('start').disabled = true;
+  $('start').textContent = 'Audio on';
+  setStatus('Audio on. Pick a dataset and press Play.');
+});
+$('master').addEventListener('input', () => {
+  const v = Number($('master').value);
+  $('master-out').textContent = `${v} dB`;
+  engine.setVolume(v); // same as the volume slider in the app (default -8 dB)
+});
+$('stop-all').addEventListener('click', stopAll);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') stopAll(); });
+
+try {
+  cfgs = await loadConfigs();
+  cfgs.forEach(buildDataset);
+  buildScan();
+  buildSymphony();
+  for (const part of ['master', 'scan', 'legend']) {
+    const fs = document.createElement('fieldset');
+    fs.innerHTML = `<legend>${part}</legend>`;
+    buildEditor(fs, TUNING[part], [part]);
+    $('shared-tuning').appendChild(fs);
+  }
+  showChanges();
+  $('copy').addEventListener('click', async () => {
+    showChanges();
+    const text = $('json').value;
+    try { await navigator.clipboard.writeText(text); setStatus('Settings copied to the clipboard.'); }
+    catch { $('json').select(); setStatus('Could not copy automatically. The settings are selected below, press Ctrl+C.'); }
+  });
+  $('reset-tuning').addEventListener('click', resetTuning);
+} catch (err) {
+  setStatus('Could not load datasets. Open this page through a local server (Live Server), not as a file.');
+  console.warn(err);
+}
+</script>
+</body>
+</html>
