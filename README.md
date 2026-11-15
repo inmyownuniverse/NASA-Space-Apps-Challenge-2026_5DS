@@ -77,9 +77,9 @@ Tools include Tone.js, Three.js, Web Audio, Web Speech, the Vibration API, ffmpe
 
 Optional colorbar tool: `pip install -r tools/requirements.txt`, then `python tools/sample_colorbar.py --help`.
 
-### Run with the Chordy server (optional)
+### Run with the Rocky server (optional)
 
-Chordy is our guide character. The page tour works everywhere, but Chordy's live chat and the
+Rocky is our guide character. The page tour works everywhere, but Rocky's live chat and the
 spoken legend in Indian languages need our small local server, because they use API keys that must
 never go into the website. On the live site (GitHub Pages) the app tells you this and uses your
 browser's English voice instead.

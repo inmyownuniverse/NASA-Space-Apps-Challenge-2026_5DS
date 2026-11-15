@@ -1,57 +1,29 @@
-// Owner: Hazel · Support: Freia
-// The guide character: greeting, page tour, section explanations and the optional live chat.
-// Its name, title and picture come from js/guide.js.
-
-import { GUIDE } from './guide.js';
-import { initAudio, playChirp } from './sound/engine.js';
-
 const tourStops = [
   ['.library', 'Dataset library', (data) =>
-    'You have four NASA datasets! You’re exploring ' + data.title + '. Pick another dataset here to hear a different part of Earth.'],
+    'Grace had a spaceship. You have four NASA datasets! You’re exploring ' + data.title + '. Pick another dataset here to hear a different part of Earth.'],
   ['#stage', 'Earth visualization', (data) =>
-    data.description + ' This picture gives us clues to turn into sound. I’m made of chords, so this feels like home.'],
+    data.description + ' This picture gives us clues to turn into sound. On Erid we use musical sounds to talk, so this feels like home.'],
   ['#player-controls', 'Playback controls', () =>
-    'Press Play to hear the picture change over time, or drag the timeline to jump to a moment. Changing volume makes the sound louder or quieter. It can’t turn up the Sun, sadly.'],
+    'Press Play to hear the picture change over time, or drag the timeline to jump to a moment. Changing volume makes the sound louder or quieter. It can’t turn up the Sun, which would have saved Grace and me some work.'],
   ['.modes', 'Play and Scan', () =>
-    'Play follows the video. Scan holds one frame still and reads across it from left to right. Imagine reading a page with your ears.'],
+    'Play follows the video. Scan holds one frame still and reads across it from left to right. Imagine reading a page with your ears. Five hands help with pages, by the way.'],
   ['.sonic-legend', 'Sonic legend', (data) =>
-    'This is your sound dictionary: ' + (data.legend[0] ? data.legend[0].sound + ' means ' + data.legend[0].means : 'each entry explains a sound') + '. Learn the sounds first and the music makes sense straight away.'],
+    'This is your sound dictionary: ' + (data.legend[0] ? data.legend[0].sound + ' means ' + data.legend[0].means : 'each entry explains a sound') + '. Grace and I started with a dictionary too. Ours needed more humming.'],
   ['#readout', 'Live readout', () =>
-    'Look here for readings as the video plays or the scan moves. The dots keep a short history so you can compare one reading with another. Even sound scientists take notes.'],
+    'Look here for readings as the video plays or the scan moves. The dots keep a short history so you can compare one reading with another. Even rock scientists take notes.'],
   ['.mapping-notes', 'How we mapped it', () =>
-    'Here’s the recipe for turning the picture into music, plus a link to the original NASA visualization. That’s the end of our tour. High five!'],
+    'Here’s the recipe for turning the picture into music, plus a link to the original NASA visualization. That’s the end of our tour. Fist bump! I brought five options.'],
 ];
+
+import { initAudio, playChirp } from './sound/engine.js';
 
 // Live chat needs our local server (server.mjs). On a static site like GitHub Pages it isn't
 // there: we find that out once and then stop asking, so the console isn't filled with errors.
 let liveChat = null; // null = not tried yet, true = server answered, false = no server
-const NO_SERVER = GUIDE.name + '’s live chat works when you run the app locally with our server. The tour works everywhere.';
-
-/** Put the guide's name and picture into the page (the HTML has the same defaults). */
-function applyIdentity(panel) {
-  panel.setAttribute('aria-label', GUIDE.title);
-  panel.querySelectorAll('img').forEach((img) => { img.src = GUIDE.avatar; });
-  const title = panel.querySelector('#rocky-title');
-  if (title) title.textContent = GUIDE.name;
-  const greeting = panel.querySelector('#rocky-greeting');
-  if (greeting) greeting.textContent = 'Hi, I’m ' + GUIDE.name + ', ' + GUIDE.about + '! Tap me for a tour or to ask a question.';
-  panel.querySelector('#rocky-search')?.setAttribute('aria-label', 'Choose what ' + GUIDE.name + ' explains');
-  panel.querySelector('#rocky-close')?.setAttribute('aria-label', 'Close ' + GUIDE.name + ' chat');
-}
-
-/** The guide's chord chirp, made with Tone.js (no sound file needed). */
-async function chirp() {
-  try {
-    await initAudio();
-    playChirp();
-  } catch {
-    // no audio yet: stay quiet
-  }
-}
+const NO_SERVER = 'Rocky’s live chat works when you run the app locally with our server. The tour works everywhere.';
 
 export function bindRocky() {
   const panel = document.getElementById('rocky');
-  applyIdentity(panel);
   const answer = panel.querySelector('#rocky-answer');
   const form = panel.querySelector('form');
   const input = form.querySelector('input');
@@ -59,6 +31,12 @@ export function bindRocky() {
   const mascot = panel.querySelector('.rocky-mascot');
   const chat = panel.querySelector('#rocky-chat-panel');
   const toggle = panel.querySelector('#rocky-chat');
+  // Rocky's chord chirp is made with Tone.js (the .wav file is not in the repo).
+  const chirp = {
+    play: async () => { await initAudio(); playChirp(); },
+    pause() {},
+    currentTime: 0,
+  };
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const greeting = panel.querySelector('#rocky-greeting');
   let greeted = false;
@@ -76,7 +54,8 @@ export function bindRocky() {
   }
 
   function stopChirp() {
-    // The chirp is under half a second long, so there is nothing to stop.
+    chirp.pause();
+    chirp.currentTime = 0;
   }
   let active;
 
@@ -295,7 +274,7 @@ export function bindRocky() {
   function setChat(open) {
     chat.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
-    toggle.setAttribute('aria-label', (open ? 'Hide ' : 'Open ') + GUIDE.name + ' chat');
+    toggle.setAttribute('aria-label', open ? 'Hide Rocky chat' : 'Open Rocky chat');
   }
 
   toggle.addEventListener('click', () => {
@@ -303,7 +282,6 @@ export function bindRocky() {
     greeted = true;
     hideGreeting();
     setChat(true);
-    chirp(); // the guide says hello when you open it (only after a click, never by surprise)
     move([{ transform: 'none' }, { transform: 'translateY(-19px) rotate(-10deg)' }, { transform: 'none' }], 430);
     input.focus();
   });
@@ -337,7 +315,7 @@ export function bindRocky() {
       mascot.classList.remove('thinking');
       return;
     }
-    answer.textContent = GUIDE.name + ' is thinking…';
+    answer.textContent = 'Rocky is thinking…';
     try {
       const response = await fetch('api/rocky', {
         method: 'POST', signal: controller.signal,
@@ -348,10 +326,10 @@ export function bindRocky() {
       if (!response.headers.get('content-type')?.includes('application/json')) {
         liveChat = false;
         answer.textContent = NO_SERVER;
-        if (['localhost', '127.0.0.1'].includes(location.hostname) && location.port !== '8000') {
+        if (['localhost', '127.0.0.1'].includes(location.hostname)) {
           const link = document.createElement('a');
           link.href = 'http://127.0.0.1:8000/#play';
-          link.textContent = 'Open the app on our server (if it is running)';
+          link.textContent = 'Open Play on the Rocky server';
           answer.append(' ', link);
         }
         return;
@@ -360,7 +338,7 @@ export function bindRocky() {
       const result = await response.json();
       if (request !== controller) return;
       if (!response.ok || !result.answer) {
-        answer.textContent = result.error ?? GUIDE.name + ' couldn’t answer. Try again shortly.';
+        answer.textContent = result.error ?? 'Rocky couldn’t answer. Try again shortly.';
         return;
       }
       answer.textContent = result.answer;
@@ -373,7 +351,8 @@ export function bindRocky() {
           { transform: 'translate(3px, -13px) rotate(-12deg)' },
           { transform: 'none' },
         ], 710);
-        chirp();
+        stopChirp();
+        chirp.play().catch(() => {});
       }
     } catch {
       if (!controller.signal.aborted) {
