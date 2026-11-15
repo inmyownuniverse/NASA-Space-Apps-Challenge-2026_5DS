@@ -43,11 +43,20 @@ export function summarize(f, cfg) {
   const sample = f.fake ? ' Sample data.' : '';
   let text = '';
 
-  if (kind === 'events') {
-    const n = flashes.length;
+  if (f.mean === null && (f.grid ?? []).every((v) => v === null)) {
+    // Night Lights' change-map sections are left silent on purpose.
+    text = 'This part of the video is silent on purpose.';
+  } else if (kind === 'events') {
+    // Flashes counted since the last summary; the very first summary uses the screen right now
+    // (strikes still visible on screen, from the strike-count grid).
+    const counted = flashes.length;
+    const onScreen = (f.grid ?? []).reduce((a, v) => a + (v ?? 0), 0);
+    const n = counted || onScreen;
     // Analyser flashes carry a grid cell; sample flashes carry x in grid columns.
     const cols = flashes.map((x) => (Number.isInteger(x.cell) ? x.cell % cfg.grid.w : x.x));
-    text = n ? `${n} flash${n === 1 ? '' : 'es'}${side(cols, cfg.grid.w).replace('in the west', 'on the left').replace('in the east', 'on the right')}.` : 'No lightning right now.';
+    text = !n ? 'No lightning right now.'
+      : !counted ? `${n} lightning strike${n === 1 ? '' : 's'} on screen.`
+      : `${n} flash${n === 1 ? '' : 'es'}${side(cols, cfg.grid.w).replace('in the west', 'on the left').replace('in the east', 'on the right')}.`;
   } else if (kind === 'density') {
     const vals = (f.grid ?? []).filter((v) => v !== null);
     const lit = tuned(cfg).sound.litAbove ?? 5;

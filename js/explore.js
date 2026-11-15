@@ -160,7 +160,7 @@ function extractedText(spot) {
   }
   if (spot.mode === 'layers') {
     return v > 0
-      ? `${Math.round(v * 100)}% of this cell shows aerosol colour${spot.species ? `, mostly ${spot.species}` : ''}.`
+      ? `${Math.round(v * 100)}% of this cell shows aerosol colour${spot.species ? `, mostly ${spot.species.toLowerCase()}` : ''}.`
       : 'No aerosol colour in this cell.';
   }
   return `${fmt(v)}`;
