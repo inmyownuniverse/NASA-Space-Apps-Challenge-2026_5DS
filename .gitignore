@@ -16,3 +16,6 @@ media/nightlights.mp4
 # Local API credentials
 .env
 .env.*
+/env
+/env (*)
+*.env
