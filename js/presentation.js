@@ -9,7 +9,7 @@ export const fixtures = {
   lightning: {
     dates: 'Jan 2017 – Jul 2023', preview: 'media/lightning.jpg', accent: '#aeb6ff',
     instrument: 'Percussion', duration: 42,
-    mapping: 'Each detected flash triggers a drum hit. The stereo position follows the flash from west to east.',
+    mapping: 'Each detected flash triggers a drum hit. The stereo position follows the flash from left to right on the screen.',
     readout: { label: 'Detected flashes', value: 0, unit: 'flashes' },
     cells: { '16,8': { value: 0, unit: 'flashes' }, '17,8': { value: 12, unit: 'flashes', hotspot: true } },
   },
@@ -22,7 +22,7 @@ export const fixtures = {
   aerosols: {
     dates: '19 Aug 2025', preview: 'media/aerosols.png', accent: '#ecace8',
     instrument: 'Dust · Smoke · Sea salt · Sulfate', duration: 36,
-    mapping: 'Each aerosol layer has its own timbre. Greater concentrations make that layer louder.',
+    mapping: 'Each aerosol layer has its own timbre. A bigger share of the picture makes that layer louder.',
     readout: { label: 'Dominant layer', value: null },
     cells: { '16,8': { value: 'Sea salt', unit: '' }, '17,8': { value: 'Dust', unit: '', hotspot: true } },
   },
