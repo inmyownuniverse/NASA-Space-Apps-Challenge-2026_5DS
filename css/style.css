@@ -1189,3 +1189,10 @@ body.rocky-picking, body.rocky-picking #jukebox :not(#rocky, #rocky *) {
   background: #f4c49825;
   box-shadow: 0 0 14px #f4c49840;
 }
+
+.legend-language { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; font-size: .85rem; }
+.legend-language select { font: inherit; color: inherit; background: #14171b; border: 1px solid #454a52; border-radius: 6px; padding: .5rem; }
+#legend-voice-status:not(:empty) { margin-top: .45rem; }
+
+.play-console #legend-button { margin-top: .7rem; padding-inline: 1rem; border-color: #53646a; }
+.play-console #legend-button:hover { background: #233034; border-color: var(--accent); }

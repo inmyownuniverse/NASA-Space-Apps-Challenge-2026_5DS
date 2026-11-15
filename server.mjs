@@ -84,9 +84,59 @@ async function rocky(req, res) {
   reply(res, 200, { answer });
 }
 
+const legendLanguages = new Set('en hi bn gu kn ml mr od pa ta te'.split(' ').map(code => code + '-IN'));
+const legendAudio = new Map();
+
+async function sarvam(path, body) {
+  const response = await fetch('https://api.sarvam.ai/' + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-subscription-key': process.env.SARVAM_API_KEY || process.env.SARVAM_API },
+    signal: AbortSignal.timeout(12000),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error('Sarvam request failed: ' + response.status);
+  return response.json();
+}
+
+async function narrate(text, language) {
+  if (language !== 'en-IN') {
+    const translation = await sarvam('translate', {
+      input: text, source_language_code: 'en-IN', target_language_code: language, model: 'sarvam-translate:v1',
+    });
+    if (!translation.translated_text) throw new Error('Missing translation');
+    text = translation.translated_text;
+  }
+  const { audios } = await sarvam('text-to-speech', { text, language_code: language, model: 'bulbul:v3' });
+  if (!audios?.[0]) throw new Error('Missing narration');
+  return Buffer.from(audios[0], 'base64');
+}
+
+async function serveLegend(req, res, params) {
+  if (req.method !== 'GET') return reply(res, 405, { error: 'Use GET.' });
+  if (req.headers['sec-fetch-site'] === 'cross-site') return reply(res, 403, { error: 'Use narration from the Jukebox.' });
+  const config = configs.get(params.get('dataset'));
+  const language = params.get('language');
+  const line = params.get('line');
+  const entry = /^\d+$/.test(line ?? '') && config?.legend[Number(line)];
+  if (!config || !legendLanguages.has(language) || (line !== 'intro' && !entry)) return reply(res, 400, { error: 'Invalid legend selection.' });
+  if (!(process.env.SARVAM_API_KEY || process.env.SARVAM_API)) return reply(res, 503, { error: 'Legend narration is offline.' });
+  const key = [config.id, language, line === 'intro' ? line : Number(line)].join('/');
+  if (!legendAudio.has(key)) {
+    const text = entry ? entry.sound + ' means ' + entry.means + '.' : 'Sonic legend for ' + config.title + '.';
+    legendAudio.set(key, narrate(text, language).catch(error => {
+      legendAudio.delete(key);
+      throw error;
+    }));
+  }
+  const audio = await legendAudio.get(key);
+  res.writeHead(200, { 'Content-Type': 'audio/wav', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600' });
+  res.end(audio);
+}
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+    if (url.pathname === '/api/legend-voice') return await serveLegend(req, res, url.searchParams);
     if (url.pathname === '/api/rocky') return await rocky(req, res);
     const path = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
     const extension = extname(path);

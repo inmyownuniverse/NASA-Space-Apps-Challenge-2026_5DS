@@ -17,6 +17,17 @@ const state = { view: 'home', mode: 'play' };
 let datasets = [];
 let dataset;
 let legendRun = 0;
+let legendVoice;
+
+function cancelLegend() {
+  legendRun++;
+  legendVoice?.abort();
+  legendVoice = undefined;
+  byId('legend-button').textContent = 'Play legend';
+  document.querySelectorAll('#legend .speaking, #play-dialog-content .speaking').forEach(item => item.classList.remove('speaking'));
+  byId('legend-voice-status').textContent = '';
+}
+
 const legendHeard = new Set();
 let muted = false;
 
@@ -59,7 +70,7 @@ function renderLibrary() {
 
 function selectDataset(data) {
   dataset = data;
-  legendRun++;
+  cancelLegend();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   document.documentElement.style.setProperty('--accent', data.accent);
   document.querySelectorAll('[data-dataset]').forEach((button) => {
@@ -219,7 +230,7 @@ function navigate() {
     state.mode = route;
     resetReadoutTimeline();
   }
-  legendRun++;
+  cancelLegend();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   player.pause();
   if (dataset) player.setMode('play');
@@ -242,8 +253,6 @@ function navigate() {
     noteObserver.unobserve(note);
     if (state.view === 'jukebox') noteObserver.observe(note);
   });
-  byId('legend-button').removeAttribute('aria-haspopup');
-  if (route === 'play') byId('legend-button').setAttribute('aria-haspopup', 'dialog');
   if (route !== 'play' && byId('play-dialog').open) byId('play-dialog').close();
   document.querySelector('.play-summary').hidden = state.view !== 'jukebox';
   byId('jukebox').hidden = state.view !== 'jukebox' || route === 'explore';
@@ -355,33 +364,100 @@ function onVolume() {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function playNarration(datasetId, language, line, signal) {
+  const query = new URLSearchParams({ dataset: datasetId, language, line });
+  const audio = new Audio('api/legend-voice?' + query);
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      finish(false);
+    };
+    function finish(ok) {
+      signal.removeEventListener('abort', abort);
+      audio.onended = audio.onerror = null;
+      if (ok || signal.aborted) resolve();
+      else reject(new Error('Sarvam narration unavailable'));
+    }
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener('abort', abort, { once: true });
+    audio.onended = () => finish(true);
+    audio.onerror = () => finish(false);
+    audio.play().catch(() => finish(false));
+  });
+}
+
+byId('legend-language').addEventListener('change', () => {
+  cancelLegend();
+  releaseAll();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  byId('legend-voice-status').textContent = '';
+});
+
 /**
  * Sonic legend: speak each legend line, then play its example sound.
  * @returns {Promise<boolean>} true if it played to the end, false if it was stopped
  */
 async function playLegend() {
   if (!dataset) { announce('Choose a dataset first.'); return false; }
+  const selected = dataset;
+  const previousRun = legendRun;
   await ensureAudio();
+  if (dataset !== selected || previousRun !== legendRun) return false;
   if (player.isScanning()) player.setMode('play');
   if (player.isPlaying()) { player.pause(); updateTime(); }
-  const run = ++legendRun;
+  cancelLegend();
+  const run = legendRun;
+  legendVoice = new AbortController();
+  byId('legend-button').textContent = 'Stop legend';
+  const { signal } = legendVoice;
   const cfg = dataset;
-  const items = [...document.querySelectorAll('#legend li, #play-dialog-content li')];
+  const items = [...document.querySelectorAll('#legend li')];
   const stopped = () => run !== legendRun || cfg !== dataset;
 
-  legendHeard.add(cfg.id); // heard or skipped: either way, don't force it again
-  await speakAndWait(`Legend for ${cfg.title}. Press Escape to skip.`);
-  for (let i = 0; i < cfg.legend.length; i++) {
-    if (stopped()) break;
-    items.forEach((li, k) => li.classList.toggle('speaking', k % cfg.legend.length === i));
-    await speakAndWait(`${cfg.legend[i].sound} means ${cfg.legend[i].means}.`);
-    if (stopped()) break;
-    playLegendSample(cfg, i);
-    await wait(2200);
+  const language = byId('legend-language').value;
+  const status = byId('legend-voice-status');
+  status.textContent = 'Loading legend narration…';
+  let browserFallback = false;
+  async function sayLine(line, text) {
+    if (browserFallback) return speakAndWait(text);
+    try {
+      await playNarration(cfg.id, language, line, signal);
+      if (!stopped()) status.textContent = '';
+    } catch (error) {
+      if (stopped()) return;
+      if (language !== 'en-IN') throw error;
+      browserFallback = true;
+      status.textContent = 'Using your browser’s English voice.';
+      await speakAndWait(text);
+    }
   }
-  items.forEach((li) => li.classList.remove('speaking'));
+  try {
+    await sayLine('intro', 'Sonic legend for ' + cfg.title + '.');
+    for (let i = 0; i < cfg.legend.length && !stopped(); i++) {
+      items.forEach((li, k) => li.classList.toggle('speaking', k % cfg.legend.length === i));
+      await sayLine(i, cfg.legend[i].sound + ' means ' + cfg.legend[i].means + '.');
+      if (stopped()) break;
+      playLegendSample(cfg, i);
+      await wait(2200);
+    }
+  } catch {
+    if (!stopped()) {
+      status.textContent = 'Narration is unavailable in this language. Try again or choose English.';
+      announce(status.textContent);
+    }
+    return false;
+  } finally {
+    if (!stopped()) {
+      legendVoice = undefined;
+      byId('legend-button').textContent = 'Play legend';
+      items.forEach(li => li.classList.remove('speaking'));
+      releaseAll();
+    }
+  }
   if (stopped()) return false;
-  releaseAll();
+  legendHeard.add(cfg.id + '/' + language);
   return true;
 }
 
@@ -390,7 +466,7 @@ function describeNow() {
 }
 
 function stopAll() {
-  legendRun++; // cancels a legend that is playing
+  cancelLegend();
   player.pause();
   releaseAll();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -424,7 +500,7 @@ async function togglePlay() {
   else if (player.isPlaying()) player.pause();
   else if (state.mode === 'scan') player.setMode('scan');
   else {
-    if (byId('legend-first').checked && !legendHeard.has(selected.id) && !await playLegend()) return;
+    if (byId('legend-first').checked && !legendHeard.has(selected.id + '/' + byId('legend-language').value) && !await playLegend()) return;
     if (dataset !== selected || state.mode !== mode || state.view !== 'jukebox') return;
     await player.play();
   }
@@ -452,17 +528,9 @@ byId('record-btn').addEventListener('click', toggleRecord);
 byId('video').addEventListener('loadedmetadata', updateTime);
 byId('video').addEventListener('timeupdate', updateTime);
 byId('video').addEventListener('ended', updateTime);
-playDialog.addEventListener('close', () => {
-  if (byId('play-dialog-title').textContent === 'Sonic legend') stopAll();
-});
 byId('legend-button').addEventListener('click', () => {
-  if (!dataset) return;
-  if (state.mode === 'play') {
-    const legend = byId('legend').cloneNode(true);
-    legend.removeAttribute('id');
-    showPlayDialog('Sonic legend', legend);
-  }
-  playLegend();
+  if (legendVoice) stopAll();
+  else playLegend();
 });
 
 const MODES = ['play', 'scan', 'explore'];
