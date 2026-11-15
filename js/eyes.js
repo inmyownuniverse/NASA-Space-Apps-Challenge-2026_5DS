@@ -24,6 +24,11 @@ function trend(now, before, step) {
   return ', steady';
 }
 
+/** Readable layer name: the legend label from the config if there is one ("Black Carbon"). */
+function layerName(key, cfg) {
+  return (cfg.extract?.classes?.[key]?.label ?? key.replace(/_/g, ' ')).toLowerCase();
+}
+
 function side(xs, gw) {
   if (!xs.length) return '';
   const avg = xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -40,7 +45,9 @@ export function summarize(f, cfg) {
 
   if (kind === 'events') {
     const n = flashes.length;
-    text = n ? `${n} flash${n === 1 ? '' : 'es'}${side(flashes.map((x) => x.x), cfg.grid.w)}.` : 'No lightning right now.';
+    // Analyser flashes carry a grid cell; sample flashes carry x in grid columns.
+    const cols = flashes.map((x) => (Number.isInteger(x.cell) ? x.cell % cfg.grid.w : x.x));
+    text = n ? `${n} flash${n === 1 ? '' : 'es'}${side(cols, cfg.grid.w).replace('in the west', 'on the left').replace('in the east', 'on the right')}.` : 'No lightning right now.';
   } else if (kind === 'density') {
     const vals = (f.grid ?? []).filter((v) => v !== null);
     const lit = tuned(cfg).sound.litAbove ?? 5;
@@ -50,7 +57,7 @@ export function summarize(f, cfg) {
   } else if (kind === 'layers') {
     const entries = Object.entries(f.layers ?? {}).sort((a, b) => b[1] - a[1]);
     text = entries.length
-      ? `Strongest is ${entries[0][0]}${entries.length > 1 ? `, then ${entries[1][0]}` : ''}.`
+      ? `Strongest is ${layerName(entries[0][0], cfg)}${entries.length > 1 ? `, then ${layerName(entries[1][0], cfg)}` : ''}.`
       : 'Particle types are not measured yet.';
   } else if (f.mean !== null && f.mean !== undefined) {
     // Kept short so it fits easily between summaries.
