@@ -1,0 +1,269 @@
+<!doctype html>
+<!-- Audit-only check page: proves which frame each Night Lights sample analysed. -->
+<meta charset="utf-8" />
+<title>Night Lights browser verification</title>
+<style>
+  body { background:#0e1116; color:#e6edf3; font:13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; margin:18px; }
+  table { border-collapse:collapse; margin:10px 0 18px; }
+  th, td { border:1px solid #30363d; padding:4px 9px; text-align:right; }
+  th { background:#161b22; color:#9da7b3; font-weight:600; }
+  td:first-child, th:first-child { text-align:left; }
+  .ok { color:#3fb950; } .bad { color:#f85149; }
+  h1 { font-size:15px; } h2 { font-size:13px; color:#9da7b3; margin-top:22px; }
+  #verdict { font-size:15px; padding:10px 12px; border-radius:6px; background:#161b22; }
+</style>
+<h1>Night Lights browser verification</h1>
+<div id="verdict">running…</div>
+<div id="app"></div>
+<!-- kept just-visible: a display:none video never delivers requestVideoFrameCallback -->
+<video id="video" src="../../media/nightlights_web.mp4" muted playsinline preload="auto"
+       style="position:fixed;right:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none"></video>
+
+<script type="module">
+import { analyze, resetAnalyzer } from '../../js/analyzer.js';
+
+const video = document.getElementById('video');
+const cfg = await (await fetch('../../datasets/nightlights.json')).json();
+const W = 1920;
+const out = document.getElementById('app');
+
+const rows = [];
+const notes = {};
+const progress = [];
+window.__progress = progress;
+window.addEventListener('error', (e) => {
+  const v = document.getElementById('verdict');
+  v.className = 'bad';
+  v.textContent = 'script error: ' + (e.message ?? e);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const v = document.getElementById('verdict');
+  v.className = 'bad';
+  v.textContent = 'rejection: ' + (e.reason?.stack || e.reason);
+});
+
+// ---- frame identity: per-pixel hash + mean of the analysed crop ----
+const probe = document.createElement('canvas');
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+function readCrop() {
+  const c = cfg.crop;
+  if (probe.width !== c.w || probe.height !== c.h) { probe.width = c.w; probe.height = c.h; }
+  pctx.drawImage(video, c.x, c.y, c.w, c.h, 0, 0, c.w, c.h);
+  return pctx.getImageData(0, 0, c.w, c.h).data;
+}
+function signature(d) {
+  let h1 = 5381, h2 = 52711, sum = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) | 0;
+    h1 = ((h1 * 33) ^ l) >>> 0;
+    h2 = ((h2 * 31) + l) >>> 0;
+    sum += l; n++;
+  }
+  return { hash: h1.toString(16) + '-' + h2.toString(16), mean: sum / n };
+}
+
+// Independently measured with ffmpeg on the same file (mean luminance of the crop).
+const FFMPEG_CROP_MEAN = {
+  '5': 8.394, '15': 8.452, '30': 13.722, '40': 12.704, '9.4': 8.275,
+  '9.433': 8.211, '21.233': 8.088, '21.267': 8.146, '36.567': 12.358, '36.6': 12.358,
+};
+
+// ---- seek and wait until the decoder has actually PRESENTED that frame ----
+// Registered BEFORE the seek: a paused video presents exactly one frame when it
+// finishes seeking, so a callback registered afterwards would miss it.
+function presentedFrameWatcher(t) {
+  let settle = () => {};
+  const p = new Promise((resolve) => { settle = resolve; });
+  let id = 0, settled = false;
+  const finish = (meta) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    if (id && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(id);
+    settle(meta ?? null);
+  };
+  const check = (_now, meta) => {
+    if (meta && Math.abs(meta.mediaTime - t) < 0.05) finish(meta);
+    else if (video.requestVideoFrameCallback) id = video.requestVideoFrameCallback(check);
+  };
+  const timer = setTimeout(() => finish(null), 900);
+  if (video.requestVideoFrameCallback) id = video.requestVideoFrameCallback(check);
+  else finish(null);
+  return { promise: p, cancel: () => finish(null) };
+}
+
+function rvfcAvailable() {
+  return typeof video.requestVideoFrameCallback === 'function';
+}
+
+async function seekAndPresent(t) {
+  const before = video.currentTime;
+  const watcher = document.hidden ? null : presentedFrameWatcher(t);
+  const seeked = new Promise((res) => {
+    video.addEventListener('seeked', res, { once: true });
+    setTimeout(res, 3000); // guard: never hang on a seek event
+  });
+  video.currentTime = t;
+  await seeked;
+  const meta = watcher ? await watcher.promise : null;
+  return { before, after: video.currentTime, meta };
+}
+
+// 8×8 block means of the analysed crop: a structural fingerprint that survives
+// the browser's YUV→sRGB conversion differences.
+function grid8x8(d, w, h) {
+  const out = [];
+  for (let by = 0; by < 8; by++) {
+    for (let bx = 0; bx < 8; bx++) {
+      let sum = 0, n = 0;
+      const x0 = Math.floor(bx * w / 8), x1 = Math.floor((bx + 1) * w / 8);
+      const y0 = Math.floor(by * h / 8), y1 = Math.floor((by + 1) * h / 8);
+      for (let y = y0; y < y1; y += 2) {
+        for (let x = x0; x < x1; x += 2) {
+          const i = (y * w + x) * 4;
+          sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          n++;
+        }
+      }
+      out.push(Number((sum / n).toFixed(2)));
+    }
+  }
+  return out;
+}
+
+if (video.readyState < 2) {
+  await new Promise((res, rej) => {
+    video.addEventListener('loadeddata', res, { once: true });
+    video.addEventListener('error', () => rej(new Error('video error ' + (video.error?.code ?? '?'))), { once: true });
+    setTimeout(() => rej(new Error('timeout loading video')), 20000);
+  });
+}
+
+notes.canPlay_avc1 = document.createElement('video').canPlayType('video/mp4; codecs="avc1.42E01E"');
+notes.canPlay_hevc = document.createElement('video').canPlayType('video/mp4; codecs="hvc1.1.6.L120.90"');
+notes.video = `${video.videoWidth}x${video.videoHeight}, ${video.duration.toFixed(3)}s, readyState ${video.readyState}`;
+
+for (const t of [5, 15, 30, 40, 9.4, 9.433, 21.233, 21.267, 36.567, 36.6]) {
+  const { before, after, meta } = await seekAndPresent(t);
+  const cropData = readCrop();
+  const sig = signature(cropData);
+  const grid = grid8x8(cropData, cfg.crop.w, cfg.crop.h);
+  const t0 = performance.now();
+  const f = analyze(video, cfg);
+  const ms = performance.now() - t0;
+  const ref = FFMPEG_CROP_MEAN[String(t)];
+  progress.push(t);
+  rows.push({
+    requested: t,
+    timeBefore: Number(before.toFixed(3)),
+    currentTime: Number(after.toFixed(3)),
+    presented: meta ? Number(meta.mediaTime.toFixed(3)) : null,
+    hash: sig.hash,
+    cropMean: Number(sig.mean.toFixed(2)),
+    refMean: ref,
+    meanDelta: Number(Math.abs(sig.mean - ref).toFixed(2)),
+    grid8: grid,
+    phase: f.phase ?? '(silent)',
+    mean: f.mean === null ? null : Number(f.mean.toFixed(2)),
+    max: f.max === null ? null : Number(f.max.toFixed(2)),
+    nulls: f.grid.filter((v) => v === null).length,
+    lit: f.grid.filter((v) => typeof v === 'number' && v > 0).length,
+    ms: Number(ms.toFixed(1)),
+  });
+}
+
+// ---- duplicate-map measurement in the browser ----
+{
+  await seekAndPresent(5);
+  if (probe.width !== W || probe.height !== 540) { probe.width = W; probe.height = 540; }
+  pctx.drawImage(video, 0, 0, W, 540, 0, 0, W, 540);
+  const d = pctx.getImageData(0, 0, W, 540).data;
+  const gray = (x, y) => { const i = (y * W + x) * 4; return 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; };
+  let best = { mae: Infinity, shift: 0 };
+  for (let s = 950; s <= 972; s++) {
+    let sum = 0, n = 0;
+    for (let y = 24; y < 540; y += 6) for (let x = 0; x < W - s; x += 6) { sum += Math.abs(gray(x, y) - gray(x + s, y)); n++; }
+    const mae = sum / n;
+    if (mae < best.mae) best = { mae, shift: s };
+  }
+  notes.duplicatePeriod = best.shift;
+  notes.duplicateMAE = Number(best.mae.toFixed(2));
+  notes.cropCoversOneCopy = cfg.crop.w <= best.shift;
+}
+
+// ---- performance on the real crop ----
+{
+  await seekAndPresent(22);
+  resetAnalyzer();
+  const t0 = performance.now();
+  for (let i = 0; i < 60; i++) analyze(video, cfg);
+  notes.analyzeMs = Number(((performance.now() - t0) / 60).toFixed(1));
+  notes.rvfcAvailable = rvfcAvailable();
+  notes.samplesWithPresentedFrame = rows.filter((r) => r.presented !== null).length;
+  notes.visibility = document.visibilityState;
+}
+
+// ---- explicit verdicts ----
+const byT = (t) => rows.find((r) => r.requested === t);
+const checks = [
+  ['t=5 annual', byT(5).phase === 'annual' && byT(5).mean > 0],
+  ['t=15 silent', byT(15).mean === null && byT(15).phase === '(silent)' && byT(15).nulls === 512],
+  ['t=30 annual', byT(30).phase === 'annual' && byT(30).mean > 0],
+  ['t=40 silent', byT(40).mean === null && byT(40).nulls === 512],
+  ['t=9.400 annual', byT(9.4).phase === 'annual'],
+  ['t=9.433 silent', byT(9.433).mean === null],
+  ['t=21.233 silent', byT(21.233).mean === null],
+  ['t=21.267 annual', byT(21.267).phase === 'annual'],
+  ['t=36.567 annual', byT(36.567).phase === 'annual'],
+  ['t=36.600 silent', byT(36.6).mean === null],
+  ['distinct frames t=5 vs t=30', byT(5).hash !== byT(30).hash],
+  ['distinct frames t=5 vs t=15', byT(5).hash !== byT(15).hash],
+  // 21.233 and 21.267 are one frame apart (34 ms): distinct hashes rule out a stale buffer.
+  // (t=9.433 is deliberately NOT used: 9.433 s sits 0.3 ms before frame 283 starts at 9.4333 s,
+  //  so both requests legitimately resolve to frame 282.)
+  ['distinct frames one frame apart (21.233 vs 21.267)', byT(21.233).hash !== byT(21.267).hash],
+  ['distinct readings t=5 vs t=30', byT(5).mean !== byT(30).mean],
+  ['currentTime matches request', rows.every((r) => Math.abs(r.currentTime - r.requested) < 0.05)],
+  ['crop mean within 1.2 of ffmpeg', rows.every((r) => r.meanDelta <= 1.2)],
+  ['presented frame matches request (when available)', rows.every((r) => r.presented === null || Math.abs(r.presented - r.requested) < 0.05)],
+  ['one world copy analysed', notes.cropCoversOneCopy],
+];
+
+const fmt = (v) => (v === null ? 'null' : String(v));
+document.getElementById('app').innerHTML = `
+  <h2>Samples (each seek is confirmed by requestVideoFrameCallback)</h2>
+  <table>
+    <tr><th>requested t</th><th>currentTime before</th><th>currentTime after</th><th>presented mediaTime</th>
+        <th>frame hash</th><th>crop mean</th><th>ffmpeg mean</th><th>&Delta;</th><th>phase</th><th>mean</th><th>max</th><th>null cells</th><th>lit cells</th><th>analyze ms</th></tr>
+    ${rows.map((r) => `<tr>
+      <td>${r.requested.toFixed(3)}</td><td>${r.timeBefore.toFixed(3)}</td><td>${r.currentTime.toFixed(3)}</td>
+      <td>${r.presented === null ? '<span class=bad>n/a</span>' : r.presented.toFixed(3)}</td><td>${r.hash}</td>
+      <td>${r.cropMean.toFixed(2)}</td><td>${r.refMean.toFixed(2)}</td>
+      <td class="${r.meanDelta <= 0.5 ? 'ok' : 'bad'}">${r.meanDelta.toFixed(2)}</td>
+      <td>${r.phase}</td><td>${fmt(r.mean)}</td><td>${fmt(r.max)}</td><td>${r.nulls}</td><td>${r.lit}</td><td>${r.ms}</td>
+    </tr>`).join('')}
+  </table>
+  <h2>Environment</h2>
+  <table>
+    <tr><th>media</th><td>${notes.video}</td></tr>
+    <tr><th>canPlay avc1</th><td>${notes.canPlay_avc1 || '(no)'}</td></tr>
+    <tr><th>canPlay hevc</th><td>${notes.canPlay_hevc || '(no)'}</td></tr>
+    <tr><th>duplicate map period</th><td>${notes.duplicatePeriod} px (MAE ${notes.duplicateMAE} grey levels)</td></tr>
+    <tr><th>crop is one copy</th><td>${notes.cropCoversOneCopy}</td></tr>
+    <tr><th>analyze() per frame</th><td>${notes.analyzeMs} ms</td></tr>
+    <tr><th>samples with rVFC mediaTime</th><td>${notes.samplesWithPresentedFrame} / ${rows.length}</td></tr>
+    <tr><th>document.visibilityState</th><td>${notes.visibility}</td></tr>
+  </table>
+  <h2>Checks</h2>
+  <table>${checks.map(([n, ok]) => `<tr><td>${n}</td><td class="${ok ? 'ok' : 'bad'}">${ok ? 'PASS' : 'FAIL'}</td></tr>`).join('')}</table>
+`;
+
+const failedChecks = checks.filter(([, ok]) => !ok);
+const verdict = document.getElementById('verdict');
+verdict.className = failedChecks.length ? 'bad' : 'ok';
+verdict.textContent = failedChecks.length
+  ? `${failedChecks.length} check(s) FAILED: ${failedChecks.map(([n]) => n).join('; ')}`
+  : `all ${checks.length} browser checks passed`;
+
+window.__result = { rows, notes, checks };
+</script>

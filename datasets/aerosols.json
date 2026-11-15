@@ -1,24 +1,50 @@
 {
   "id": "aerosols",
   "title": "GEOS Aerosols",
-  "source": "https://svs.gsfc.nasa.gov/5669/",
+  "source": "https://svs.gsfc.nasa.gov/5572/",
   "video": "media/aerosols.mp4",
-  "dates": "TODO: copy from SVS page",
+  "dates": "2024-08-01 to 2024-09-14",
   "description": "Tiny particles in the air from a NASA GEOS model: dust, smoke, sea salt and sulfate, each shown in its own colour.",
-  "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
+  "crop": { "x": 0, "y": 0, "w": 1280, "h": 640 },
   "grid": { "w": 32, "h": 16 },
+  "masks": [
+    { "x": 855, "y": 575, "w": 280, "h": 60, "note": "Aerosols legend panel (title + four swatches), measured on the frame: panel spans x 858-1132, y 576-633" },
+    { "x": 207, "y": 126, "w": 53, "h": 23, "note": "caption: event label, box measured from the SVS annotation overlay" },
+    { "x": 693, "y": 175, "w": 53, "h": 24, "note": "caption: event label" },
+    { "x": 532, "y": 192, "w": 57, "h": 23, "note": "caption: camera icon + label" },
+    { "x": 1143, "y": 216, "w": 57, "h": 25, "note": "caption: event label (right edge)" },
+    { "x": 85, "y": 240, "w": 63, "h": 24, "note": "caption: event label (left edge)" },
+    { "x": 1145, "y": 240, "w": 72, "h": 25, "note": "caption: event label (right edge)" },
+    { "x": 421, "y": 243, "w": 67, "h": 23, "note": "caption: event label" },
+    { "x": 396, "y": 317, "w": 53, "h": 23, "note": "caption: event label" },
+    { "x": 736, "y": 326, "w": 53, "h": 23, "note": "caption: event label" }
+  ],
+  "extract": {
+    "mode": "layers",
+    "brightnessFloor": 0.26,
+    "chromaFloor": 0.25,
+    "hueTolerance": 26,
+    "ambiguityBand": 7,
+    "changeThreshold": 0.02,
+    "classes": {
+      "black_carbon": { "hue": 11.7, "rgb": [208, 93, 65], "label": "Black Carbon" },
+      "dust": { "hue": 275.3, "rgb": [191, 151, 219], "label": "Dust" },
+      "sea_salt": { "hue": 174.5, "rgb": [134, 167, 164], "label": "Sea Salt" },
+      "sulfate": { "hue": 109.9, "rgb": [81, 219, 53], "label": "Sulfate" }
+    }
+  },
   "colorbar": {
-    "unit": "aerosol optical depth",
+    "unit": "relative visual aerosol density",
     "stops": [
       { "rgb": [0, 0, 0], "value": 0 },
       { "rgb": [255, 255, 255], "value": 1 }
     ],
     "maxDist": 60,
     "layers": {
-      "dust": { "rgb": [210, 170, 90] },
-      "smoke": { "rgb": [120, 120, 120] },
-      "salt": { "rgb": [70, 140, 230] },
-      "sulfate": { "rgb": [230, 230, 230] }
+      "black_carbon": { "rgb": [208, 93, 65] },
+      "dust": { "rgb": [191, 151, 219] },
+      "sea_salt": { "rgb": [134, 167, 164] },
+      "sulfate": { "rgb": [81, 219, 53] }
     }
   },
   "sound": {
@@ -41,5 +67,5 @@
     { "sound": "soft bells", "means": "sulfate" }
   ],
   "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
-  "_todo": "Aahana: measure crop box and sample the real colour of each aerosol layer (the layer rgb values are guesses). Freia: tune sound block and one instrument per layer."
+  "_todo": "Freia: sound.instruments still says smoke/salt; the analyzer now emits the canonical keys black_carbon, dust, sea_salt, sulfate."
 }

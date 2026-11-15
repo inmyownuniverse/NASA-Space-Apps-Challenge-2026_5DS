@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lightning browser verification</title>
+<style>
+  body { font: 13px/1.45 system-ui, sans-serif; background:#111; color:#e8e8e8; margin:24px; }
+  h1 { font-size:17px; margin:0 0 12px; }
+  #verdict { font-weight:700; margin:12px 0; padding:8px 10px; border-radius:6px; }
+  #verdict.ok { background:#143d1c; color:#8ef0a6; }
+  #verdict.bad { background:#4a1414; color:#ff9b9b; }
+  table { border-collapse:collapse; margin:10px 0; font-variant-numeric:tabular-nums; }
+  th,td { border:1px solid #333; padding:3px 7px; text-align:right; }
+  th { background:#1c1c1c; }
+  td.ok { color:#8ef0a6; } td.bad { color:#ff9b9b; }
+  ul { padding-left:20px; } li.ok { color:#8ef0a6; } li.bad { color:#ff9b9b; }
+  video { position:fixed; right:0; bottom:0; width:2px; height:2px; opacity:.01; pointer-events:none; }
+</style>
+</head>
+<body>
+<h1>Lightning browser verification (real video, real analyzer)</h1>
+<div id="verdict">running…</div>
+<video id="video" src="../../media/lightning.mp4" muted playsinline preload="auto"></video>
+<div id="out"></div>
+<script type="module">
+const video = document.getElementById('video');
+const verdict = document.getElementById('verdict');
+window.addEventListener('error', (e) => { verdict.className = 'bad'; verdict.textContent = 'script error: ' + (e.message ?? e); });
+window.addEventListener('unhandledrejection', (e) => { verdict.className = 'bad'; verdict.textContent = 'rejection: ' + (e.reason?.stack || e.reason); });
+
+const { analyze, resetAnalyzer } = await import('../../js/analyzer.js');
+const cfg = await (await fetch('../../datasets/lightning.json')).json();
+
+if (video.readyState < 2) {
+  await new Promise((res, rej) => {
+    video.addEventListener('loadeddata', res, { once: true });
+    video.addEventListener('error', () => rej(new Error('video error ' + (video.error?.code ?? '?'))), { once: true });
+    setTimeout(() => rej(new Error('timeout loading video')), 20000);
+  });
+}
+
+async function seek(t) {
+  const before = video.currentTime;
+  const seeked = new Promise((res) => {
+    video.addEventListener('seeked', res, { once: true });
+    setTimeout(res, 3000);
+  });
+  video.currentTime = t;
+  await seeked;
+  return { before, after: video.currentTime };
+}
+
+const samples = [];
+async function step(t) {
+  const s = await seek(t);
+  const t0 = performance.now();
+  const f = analyze(video, cfg);
+  const ms = performance.now() - t0;
+  const strikes = f.grid.reduce((a, v) => a + (typeof v === 'number' ? v : 0), 0);
+  samples.push({
+    requested: t, currentTime: Number(s.after.toFixed(3)),
+    newEvents: f.flashes.length, strikes, max: f.max,
+    mean: f.mean === null ? null : Number(f.mean.toFixed(3)),
+    nulls: f.grid.filter((v) => v === null).length,
+    change: Number(f.change.toFixed(3)), space: f.flashSpace, rejected: f.flashRejected,
+    globe: f.flashGlobe, ms: Number(ms.toFixed(1)),
+    flashes: f.flashes,
+  });
+  return f;
+}
+
+// A. detection and dedup on consecutive frames
+resetAnalyzer();
+const f90 = await step(90);
+const f90b = await step(90.034);
+const f90c = await step(90.068);
+// B. seek jump
+const f180 = await step(180);
+const f180b = await step(180.034);
+// C. close-up phase (globe cropped)
+resetAnalyzer();
+const f30 = await step(30);
+// D. clock phase
+resetAnalyzer();
+await step(45);
+const f45b = await step(45.034);
+
+const panel = cfg.masks[0];
+const inPanel = (e) => e.x >= panel.x && e.x < panel.x + panel.w && e.y >= panel.y && e.y < panel.y + panel.h;
+const key = (e) => `${e.nx.toFixed(3)},${e.ny.toFixed(3)}`;
+const firstPositions = new Set(f90b.flashes.map(key));
+
+const checks = [
+  ['t=90 first frame: no events (baseline)', f90.flashes.length === 0],
+  ['t=90: hundreds of strikes detected', samples[0].strikes > 200],
+  ['t=90.034: new events appear', f90b.flashes.length > 0],
+  ['t=90.068: no repeated positions', f90c.flashes.every((e) => !firstPositions.has(key(e)))],
+  ['seek 90→180 suppresses events', f180.flashes.length === 0],
+  ['seek reports change 0', f180.change === 0],
+  ['tracking resumes at 180.034', f180b.flashes.length > 0],
+  ['close-up reports screen-relative coords', f30.flashSpace === 'screen'],
+  ['close-up globe flagged incomplete', !!f30.flashGlobe && f30.flashGlobe.complete === false],
+  ['wide shot reports globe-relative coords', f90.flashSpace === 'globe' && f180.flashSpace === 'globe'],
+  // The camera is locked from ~70 s: the disc is the same at 90 s and 180 s. The
+  // earlier apparent zoom was the terminator changing the lit crescent, not the globe.
+  [`globe is stable 90→180 (r ${samples[0].globe?.r} → ${samples[3].globe?.r})`,
+    Math.abs(samples[3].globe.r - samples[0].globe.r) < 10],
+  [`no blob rejected as off-disc at these frames (${samples.map((s) => s.rejected).join('/')})`,
+    samples.every((s) => s.rejected === 0)],
+  ['no event inside the clock/wheel panel', samples.every((s) => s.flashes.every((e) => !inPanel(e)))],
+  ['panel masks exactly 20 cells', samples.every((s) => s.nulls === 20)],
+  ['every event has the six documented fields',
+    samples.every((s) => s.flashes.every((e) => Object.keys(e).length === 6))],
+  ['nx/ny stay inside 0..1 (globe box or crop)',
+    samples.every((s) => s.flashes.every((e) => e.nx >= 0 && e.nx <= 1 && e.ny >= 0 && e.ny <= 1))],
+  ['globe disc matches the measured limb fit (c≈640,362 r≈315)',
+    samples.filter((s) => s.space === 'globe').every((s) => s.globe
+      && Math.abs(s.globe.cx - 640) <= 8 && Math.abs(s.globe.cy - 362) <= 8 && Math.abs(s.globe.r - 315) <= 10)],
+  ['every event lies inside the globe silhouette',
+    samples.every((s) => s.flashes.every((e) => !s.globe || !s.globe.complete
+      || Math.hypot(e.x - s.globe.cx, e.y - s.globe.cy) <= s.globe.r * 1.031))],
+  // Budget: the player analyses at ~4 Hz, so a frame must fit in a 250 ms slot.
+  ['analyze() fits a 4 Hz slot (<150 ms incl. canvas readback)', samples.every((s) => s.ms < 150)],
+];
+
+const failed = checks.filter((c) => !c[1]);
+verdict.className = failed.length ? 'bad' : 'ok';
+verdict.textContent = failed.length
+  ? `${failed.length} of ${checks.length} checks FAILED`
+  : `all ${checks.length} browser checks passed`;
+
+const fmt = (v) => (v === null || v === undefined ? '—' : v);
+document.getElementById('out').innerHTML = `
+  <table>
+    <tr><th>requested t</th><th>video.currentTime</th><th>space</th><th>globe r</th><th>strikes</th>
+        <th>max cell</th><th>mean</th><th>null cells</th><th>new events</th><th>rejected</th><th>change</th><th>analyze ms</th></tr>
+    ${samples.map((s) => `<tr>
+      <td>${s.requested.toFixed(3)}</td><td>${s.currentTime.toFixed(3)}</td><td>${s.space}</td>
+      <td>${s.globe ? s.globe.r : '—'}</td><td>${s.strikes}</td><td>${s.max}</td><td>${fmt(s.mean)}</td>
+      <td>${s.nulls}</td><td>${s.newEvents}</td><td>${s.rejected}</td><td>${s.change}</td><td>${s.ms}</td></tr>`).join('')}
+  </table>
+  <ul>${checks.map(([n, ok]) => `<li class="${ok ? 'ok' : 'bad'}">${ok ? 'PASS' : 'FAIL'} — ${n}</li>`).join('')}</ul>
+  <p>video: ${video.videoWidth}×${video.videoHeight}, ${video.duration.toFixed(2)} s, visibilityState ${document.visibilityState}</p>
+  <p>sample events (t=90.034): ${JSON.stringify(f90b.flashes.slice(0, 4))}</p>
+`;
+
+window.__result = {
+  checks, samples: samples.map(({ flashes, ...rest }) => rest),
+  events: f90b.flashes.slice(0, 8),
+  video: { w: video.videoWidth, h: video.videoHeight, duration: video.duration, visibility: document.visibilityState },
+};
+</script>
+</body>
+</html>

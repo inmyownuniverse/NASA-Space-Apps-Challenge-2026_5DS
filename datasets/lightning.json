@@ -3,17 +3,39 @@
   "title": "Lightning from the ISS",
   "source": "https://svs.gsfc.nasa.gov/5011/",
   "video": "media/lightning.mp4",
-  "dates": "TODO: copy from SVS page",
+  "dates": "2017–2023 (10-day roving window; the video opens on Mar 01 2017 and the year wheel ends at 2023)",
   "description": "Lightning flashes seen from the International Space Station. Each bright flash is one strike.",
   "crop": { "x": 0, "y": 0, "w": 1280, "h": 720 },
   "grid": { "w": 32, "h": 16 },
+  "masks": [
+    {
+      "x": 1090,
+      "y": 555,
+      "w": 190,
+      "h": 165,
+      "note": "Bottom-right control/annotation panel: date clock (0–66 s) and 10-day roving window year/month wheel (from ~68 s). Both are white text that would otherwise read as flashes."
+    }
+  ],
   "colorbar": {
-    "unit": "flash brightness",
+    "unit": "flashes per cell",
     "stops": [
       { "rgb": [0, 0, 0], "value": 0 },
       { "rgb": [255, 255, 255], "value": 1 }
     ],
     "maxDist": 60
+  },
+  "extract": {
+    "mode": "flashes",
+    "core": { "r": 235, "g": 235 },
+    "halo": { "r": 185, "g": 165, "bMax": 145, "rMinusB": 70 },
+    "minHaloPixels": 2,
+    "minArea": 2,
+    "maxArea": 400,
+    "dedupPixels": 4,
+    "dedupNorm": 0.02,
+    "resetNorm": 0.3,
+    "changeThreshold": 0,
+    "note": "core = blown-out centre of a fresh strike: r,g ≥ 235, which admits both the audited reference white ≈ RGB(238,238,237) and the measured centres (255,255,66)–(255,255,153). halo = saturated yellow glow around it (measured (247,255,4)–(193,185,35); the reference yellow ≈ RGB(234,234,76) also passes). Stars, the ISS ground-track line and its label are bright but have no halo, so they never count. intensity is relative visual brightness only; there is no physical lightning-intensity colourbar in this visualization."
   },
   "sound": {
     "mapper": "events",
@@ -31,5 +53,5 @@
     { "sound": "left or right", "means": "where on Earth the flash is, west or east" }
   ],
   "_tuning": "Sound numbers (octaves, voices, levels, filter, tension) are in js/sound/tuning.js.",
-  "_todo": "Aahana: measure crop box, decide flash detection threshold (is there a colorbar at all?). Freia: tune sound block. Celene: check description wording."
+  "_todo": "Aahana (data): crop, mask and flash thresholds measured on the real video — see media/README.md and tools/test_lightning.mjs. Freia: sound block unchanged and untuned for events. Celene: description/legend untouched and still to review."
 }
