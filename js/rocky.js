@@ -25,7 +25,7 @@ export function bindRocky() {
   const chat = panel.querySelector('#rocky-chat-panel');
   const toggle = panel.querySelector('#rocky-chat');
   const chirp = new Audio('media/alien-chord-chirp.wav');
-  chirp.preload = 'auto';
+  chirp.preload = 'none'; // only fetched when it plays (the sound file is not in the repo yet)
   chirp.volume = .65;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const greeting = panel.querySelector('#rocky-greeting');
