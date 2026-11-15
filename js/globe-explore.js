@@ -4,7 +4,29 @@ import { formatTime } from './a11y.js';
 const byId = (id) => document.getElementById(id);
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
+/**
+ * Latitude covered by the dataset's map rows, from its config (latMax at the top row, latMin at
+ * the bottom). SST stops at about 79 degrees south; the others cover pole to pole.
+ */
+function latRange(data) {
+  return [data.latMax ?? 90, data.latMin ?? -90];
+}
+
+/** Row centre to polar angle on the globe (0 = north pole). */
+function rowTheta(data, y) {
+  const [top, bottom] = latRange(data);
+  const lat = top - ((y + 0.5) / data.grid.h) * (top - bottom);
+  return ((90 - lat) / 180) * Math.PI;
+}
+
+/** Latitude (from a globe click) to a map row, or -1 outside the map area. */
+export function latRow(data, lat) {
+  const [top, bottom] = latRange(data);
+  const row = Math.floor(((top - lat) / (top - bottom)) * data.grid.h);
+  return row >= 0 && row < data.grid.h ? row : -1;
+}
+
+export function bindGlobeExplore({ video, select, hear, probe, setFrameExplorer, onView }) {
   const picker = byId('explore-dataset');
   const mount = byId('explore-globe');
   const status = byId('explore-map-status');
@@ -15,6 +37,28 @@ export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
   let frameExplorer = false;
   let grid = [];
   let selectionRun = 0;
+  let flat = false;          // Flat map view: the paused video frame with the flat explorer
+  const viewButtons = [byId('explore-view-globe'), byId('explore-view-flat')];
+
+  function showView() {
+    viewButtons[0]?.setAttribute('aria-pressed', String(!flat));
+    viewButtons[1]?.setAttribute('aria-pressed', String(flat));
+  }
+
+  function setView(view, { announceIt = false } = {}) {
+    flat = view === 'flat';
+    showView();
+    frameExplorer = !flat; // force refresh() to switch the explorer
+    refresh();
+    onView?.(flat ? 'flat' : 'globe');
+    if (announceIt) {
+      status.textContent = flat ? 'Flat map: click, drag or use the arrow keys on the map below.' : status.textContent;
+      // The flat map sits below the explore console: bring it into view.
+      if (flat) byId('stage')?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
+  }
+  viewButtons[0]?.addEventListener('click', () => setView('globe', { announceIt: true }));
+  viewButtons[1]?.addEventListener('click', () => setView('flat', { announceIt: true }));
 
   function valueText(value) {
     return value == null ? 'Unavailable' : value.toLocaleString(undefined, { maximumFractionDigits: 3 }) + ' ' + (data.colorbar?.unit ?? '');
@@ -22,8 +66,23 @@ export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
 
   async function inspect(column, row) {
     const run = ++selectionRun;
-    const value = grid[row * data.grid.w + column];
     const label = 'Row ' + (row + 1) + ' · Column ' + (column + 1);
+    if (row < 0) {
+      selection.textContent = 'Outside the map area of this visualization.';
+      return;
+    }
+    if (probe) {
+      // Same reading, note and proof panel as the flat map.
+      try {
+        const result = await probe(data, column, row);
+        if (run !== selectionRun) return;
+        selection.textContent = label + ' · ' + valueText(result?.value ?? null) + (result?.note ? ' · ' + result.note : '');
+      } catch {
+        if (run === selectionRun) selection.textContent = label + ' · Audio unavailable';
+      }
+      return;
+    }
+    const value = grid[row * data.grid.w + column];
     selection.textContent = label + ' · ' + valueText(value);
     if (value == null) return;
     try {
@@ -55,8 +114,9 @@ export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
     byId('explore-mean').textContent = valueText(frame?.mean);
     byId('explore-max').textContent = valueText(frame?.max);
     byId('explore-time').textContent = frame ? formatTime(video.currentTime) : '—';
-    const useGlobe = Boolean(globe);
+    const useGlobe = Boolean(globe) && !flat;
     status.textContent = !frame ? 'Waiting for a dataset frame'
+      : flat ? 'Flat map: click, drag or use the arrow keys on the map below.'
       : !useGlobe ? 'Use the source frame while the 3D map loads.'
       : lightning ? 'Drag to rotate · Scroll to zoom · Pins represent camera-grid readings, without geographic coordinates.'
       : 'Drag to rotate · Scroll to zoom · Values follow the source frame grid';
@@ -84,6 +144,8 @@ export function bindGlobeExplore({ video, select, hear, setFrameExplorer }) {
   picker.addEventListener('change', () => select(picker.value));
 
   return {
+    setView,
+    view: () => (flat ? 'flat' : 'globe'),
     setDatasets(items) {
       picker.replaceChildren(...items.map((item) => new Option(item.title, item.id)));
     },
@@ -168,8 +230,9 @@ function createGlobe(THREE, mount, status, onFallback) {
       inspect(hit.object.userData.x, hit.object.userData.y);
       return;
     }
+    // uv.y is 1 at the north pole and 0 at the south pole.
     inspect(clamp(Math.floor(hit.uv.x * config.grid.w), 0, config.grid.w - 1),
-      clamp(Math.floor((1 - hit.uv.y) * config.grid.h), 0, config.grid.h - 1));
+      latRow(config, hit.uv.y * 180 - 90));
   });
 
   function zoom(factor) {
@@ -202,7 +265,7 @@ function createGlobe(THREE, mount, status, onFallback) {
       markers.clear();
       for (const pin of pins) {
         const phi = 2 * Math.PI * (pin.x + .5) / data.grid.w;
-        const theta = Math.PI * (pin.y + .5) / data.grid.h;
+        const theta = rowTheta(data, pin.y);
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
         marker.position.set(-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta)).multiplyScalar(1.015);
         marker.userData = pin;

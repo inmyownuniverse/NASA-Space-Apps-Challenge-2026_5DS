@@ -18,7 +18,7 @@ Earth Jukebox turns EIC visualizations into sound (sonification). Three pillars:
 2. **Explorable by touch.** Move a finger, mouse or arrow keys over the map and hear the value at that spot; phones vibrate on hotspots.
 3. **Any visualization.** One engine plus one JSON config per dataset; a new visualization with a supported colour bar can be configured without changing the engine.
 
-Modes: **Play** (sound follows the video), **Scan** (a line sweeps west → east, each column becomes a chord), **Explore** (rotate and zoom the globe, select a point by mouse or touch, or use the marked-location buttons to hear a reading), and **Planet Symphony** (all four datasets playing together, each with its own level slider).
+Modes: **Play** (sound follows the video), **Scan** (a line sweeps west → east, each column becomes a chord), **Explore** (a globe or a flat map: click, drag or use the arrow keys to hear any spot, or pick a marked location; the proof panel shows the pixel colour, its place on the colour bar, the value and the note), and **Planet Symphony** (all four datasets playing together, each with its own level slider).
 
 Also: a **sonic legend** before playback, **eyes-closed mode** (E) with spoken summaries, **shareable links** (`?dataset=sst&t=30&mode=scan`), **Record track** (R), and **[Add your own visualization](add.html)**, which turns any video or image with a colour bar into a playable config. See `docs/mapping-notes.md` for plain notes on each.
 
@@ -77,9 +77,29 @@ Tools include Tone.js, Three.js, Web Audio, Web Speech, the Vibration API, ffmpe
 
 Optional colorbar tool: `pip install -r tools/requirements.txt`, then `python tools/sample_colorbar.py --help`.
 
-### Run Rocky’s science corner
+### Run with the Rocky server (optional)
 
-Keep your `GROQ_API` or `GROQ_API_KEY` in the ignored root `.env` file and run `node --env-file=.env server.mjs` from the repository root. Open http://127.0.0.1:8000/#play. Stop other servers on port 8000 first. Rocky’s introductions and science questions use the same-origin Groq endpoint. The browser sends the selected dataset ID and submitted question. Static GitHub Pages can show the built-in introductions, and live questions require hosting the Node server. Use the Node server when credentials are in this folder because generic static servers may expose the `.env` file.
+Rocky is our guide character. The page tour works everywhere, but Rocky's live chat and the
+spoken legend in Indian languages need our small local server, because they use API keys that must
+never go into the website. On the live site (GitHub Pages) the app tells you this and uses your
+browser's English voice instead.
+
+1. Install Node.js 20 or newer from https://nodejs.org (the LTS version is fine).
+2. In the repo folder, create a file called `.env` (it is already in `.gitignore`, so it never gets
+   committed) with your keys, one per line:
+   ```
+   GROQ_API=your-groq-key
+   SARVAM_API=your-sarvam-key
+   ```
+   Either line can be left out: that feature just stays off.
+3. Stop any other server using port 8000, then run this in the repo folder:
+   ```
+   node server.mjs
+   ```
+4. Open the address it prints (http://127.0.0.1:8000/).
+
+The server only serves the app's own files and never serves `.env` or any file whose name starts
+with `env` or a dot. Never put the keys in the JavaScript or JSON files.
 
 ## Accuracy and limits
 

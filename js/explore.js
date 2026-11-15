@@ -168,10 +168,24 @@ function extractedText(spot) {
 
 // ---------- proof panel ----------
 
-function panelEl() {
+/**
+ * The proof panel. With a host element it is moved there (the globe view); without one it sits
+ * right after the live readout (the flat map view).
+ */
+function panelEl(host) {
   let el = document.getElementById('probe');
-  if (el) return el;
-  el = document.createElement('section');
+  if (!el) el = createPanel();
+  if (host) {
+    if (el.parentElement !== host) host.append(el);
+  } else {
+    const readout = document.getElementById('readout-value');
+    if (readout && el.previousElementSibling !== readout) readout.after(el);
+  }
+  return el;
+}
+
+function createPanel() {
+  const el = document.createElement('section');
   el.id = 'probe';
   el.className = 'probe';
   el.setAttribute('aria-labelledby', 'probe-heading');
@@ -184,8 +198,6 @@ function panelEl() {
     <p class="probe-value"></p>
     <p class="probe-how"></p>
     <p class="probe-note"></p>`;
-  const readout = document.getElementById('readout-value');
-  (readout?.parentElement ?? document.body).insertBefore(el, readout?.nextSibling ?? null);
   return el;
 }
 
@@ -241,6 +253,61 @@ function updatePanel(panel, cfg, info) {
   q('.probe-note').textContent = `Note played: ${note ?? 'none'}`;
 }
 
+// ---------- reading one spot: shared by the flat map and the globe ----------
+
+function hotAboveFor(cfg) {
+  const s = tuned(cfg).sound;
+  const [min, max] = valueRange(cfg);
+  return s.tensionAbove ?? min + 0.9 * (max - min);
+}
+
+/** Read the spot, play its note, buzz on hotspots and fill the proof panel. */
+function sense(video, cfg, vx, vy, col, row, panel) {
+  const t = video.currentTime || performance.now() / 1000;
+  const spot = readSpot(video, cfg, vx, vy, col, row, t);
+  const value = spot.value;
+  const hot = value !== null && value > hotAboveFor(cfg);
+  // Extractor datasets: a zero reading (dark, no strikes, no aerosol) stays silent.
+  const audible = value !== null && !(spot.mode && value <= 0);
+  const note = audible ? playProbe(cfg, value, col) ?? noteForValue(cfg, value) : null;
+  if (hot) buzz(30);
+  panel.hidden = false;
+  updatePanel(panel, cfg, { col, row, spot, note, hot });
+  return { spot, value, note, hot };
+}
+
+/** One sentence for screen readers about a reading. */
+function sentence(cfg, col, row, { spot, value, note, hot }) {
+  const where = `Row ${row + 1}, column ${col + 1}, ${direction(col, row, cfg.grid.w, cfg.grid.h)}.`;
+  const what = value === null
+    ? MISS[spot.status] ?? MISS.land
+    : spot.mode
+      ? `${extractedText(spot)}${note ? ` Note ${note}.` : ''}${hot ? ' Hotspot.' : ''}`
+      : `${spot.status === 'nearest' ? 'Nearest ocean value, ' : ''}${fmt(value)} ${spokenUnit(cfg.colorbar.unit)}${note ? `, note ${note}` : ''}.${hot ? ' Hotspot.' : ''}${spot.sample ? ' Sample data.' : ''}`;
+  return `${where} ${what}`;
+}
+
+/**
+ * Read one grid cell of the frame on screen (its centre), play it and show the proof panel in
+ * `host`. Used by the globe view for pins and clicks.
+ * @returns {{ value: number|null, note: string|null, text: string }}
+ */
+export function probeCell(cfg, col, row, host) {
+  const video = document.getElementById('video');
+  const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+  const r = cellRect(cfg, col, row, vw, vh);
+  const reading = sense(video, cfg, Math.round(r.x + r.w / 2), Math.round(r.y + r.h / 2), col, row, panelEl(host));
+  const text = sentence(cfg, col, row, reading);
+  announce(text);
+  return { value: reading.value, note: reading.note, text };
+}
+
+/** Hide the proof panel (for example when the dataset changes). */
+export function hideProof() {
+  const el = document.getElementById('probe');
+  if (el) el.hidden = true;
+}
+
 // ---------- explore mode ----------
 
 /**
@@ -257,9 +324,6 @@ export function enableExplore(canvas, cfg) {
   const video = document.getElementById('video');
   const ctx = canvas.getContext('2d');
   const gw = cfg.grid.w, gh = cfg.grid.h;
-  const s = tuned(cfg).sound;
-  const [min, max] = valueRange(cfg);
-  const hotAbove = s.tensionAbove ?? min + 0.9 * (max - min);
   const panel = panelEl();
   panel.hidden = false;
 
@@ -318,30 +382,16 @@ export function enableExplore(canvas, cfg) {
   }
 
   function probe(forceAnnounce) {
-    const t = video.currentTime || performance.now() / 1000;
     const [vx, vy] = spotPixel();
-    const spot = readSpot(video, cfg, vx, vy, col, row, t);
-    lastSpot = spot;
-    const value = spot.value;
-    const hot = value !== null && value > hotAbove;
-    // Extractor datasets: a zero reading (dark, no strikes, no aerosol) stays silent.
-    const audible = value !== null && !(spot.mode && value <= 0);
-    const note = audible ? playProbe(cfg, value, col) ?? noteForValue(cfg, value) : null;
-    if (hot) buzz(30);
+    const reading = sense(video, cfg, vx, vy, col, row, panel);
+    lastSpot = reading.spot;
     drawCursor();
-    updatePanel(panel, cfg, { col, row, spot, note, hot });
-    if (DEBUG) console.debug('explore', { vx, vy, ...spot });
+    if (DEBUG) console.debug('explore', { vx, vy, ...reading.spot });
 
     const now = performance.now();
     if (!forceAnnounce && now - lastAnnounce < ANNOUNCE_GAP_MS) return;
     lastAnnounce = now;
-    const where = `Row ${row + 1}, column ${col + 1}, ${direction(col, row, gw, gh)}.`;
-    const what = value === null
-      ? MISS[spot.status] ?? MISS.land
-      : spot.mode
-        ? `${extractedText(spot)}${note ? ` Note ${note}.` : ''}${hot ? ' Hotspot.' : ''}`
-        : `${spot.status === 'nearest' ? 'Nearest ocean value, ' : ''}${fmt(value)} ${spokenUnit(cfg.colorbar.unit)}${note ? `, note ${note}` : ''}.${hot ? ' Hotspot.' : ''}${spot.sample ? ' Sample data.' : ''}`;
-    announce(`${where} ${what}`);
+    announce(sentence(cfg, col, row, reading));
   }
 
   /** Pointer position to source video pixel and grid cell (null outside the map area). */

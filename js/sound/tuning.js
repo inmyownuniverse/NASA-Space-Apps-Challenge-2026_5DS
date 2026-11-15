@@ -47,7 +47,7 @@ export const TUNING = {
   },
 
   explore: {
-    noteLength: 0.35,  // how long the note for one explored spot rings, s
+    noteLength: 0.9,   // how long the note for one explored spot rings, s (long enough for the pad to fade in)
     velocity: 0.5,     // how hard that note is played
     layerLevel: -6,    // aerosol layer volume used for explored notes, dB
   },

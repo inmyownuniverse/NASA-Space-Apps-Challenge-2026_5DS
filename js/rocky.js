@@ -15,6 +15,13 @@ const tourStops = [
     'Here’s the recipe for turning the picture into music, plus a link to the original NASA visualization. That’s the end of our tour. Fist bump! I brought five options.'],
 ];
 
+import { initAudio, playChirp } from './sound/engine.js';
+
+// Live chat needs our local server (server.mjs). On a static site like GitHub Pages it isn't
+// there: we find that out once and then stop asking, so the console isn't filled with errors.
+let liveChat = null; // null = not tried yet, true = server answered, false = no server
+const NO_SERVER = 'Rocky’s live chat works when you run the app locally with our server. The tour works everywhere.';
+
 export function bindRocky() {
   const panel = document.getElementById('rocky');
   const answer = panel.querySelector('#rocky-answer');
@@ -24,9 +31,12 @@ export function bindRocky() {
   const mascot = panel.querySelector('.rocky-mascot');
   const chat = panel.querySelector('#rocky-chat-panel');
   const toggle = panel.querySelector('#rocky-chat');
-  const chirp = new Audio('media/alien-chord-chirp.wav');
-  chirp.preload = 'none'; // only fetched when it plays (the sound file is not in the repo yet)
-  chirp.volume = .65;
+  // Rocky's chord chirp is made with Tone.js (the .wav file is not in the repo).
+  const chirp = {
+    play: async () => { await initAudio(); playChirp(); },
+    pause() {},
+    currentTime: 0,
+  };
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const greeting = panel.querySelector('#rocky-greeting');
   let greeted = false;
@@ -299,6 +309,12 @@ export function bindRocky() {
     const dataset = active;
     ask.disabled = true;
     mascot.classList.add('thinking');
+    if (liveChat === false) {
+      answer.textContent = NO_SERVER;
+      ask.disabled = false;
+      mascot.classList.remove('thinking');
+      return;
+    }
     answer.textContent = 'Rocky is thinking…';
     try {
       const response = await fetch('api/rocky', {
@@ -308,7 +324,8 @@ export function bindRocky() {
       });
       if (request !== controller) return;
       if (!response.headers.get('content-type')?.includes('application/json')) {
-        answer.textContent = 'Live chat needs the Earth Jukebox server.';
+        liveChat = false;
+        answer.textContent = NO_SERVER;
         if (['localhost', '127.0.0.1'].includes(location.hostname)) {
           const link = document.createElement('a');
           link.href = 'http://127.0.0.1:8000/#play';
@@ -317,6 +334,7 @@ export function bindRocky() {
         }
         return;
       }
+      liveChat = true;
       const result = await response.json();
       if (request !== controller) return;
       if (!response.ok || !result.answer) {
@@ -338,7 +356,8 @@ export function bindRocky() {
       }
     } catch {
       if (!controller.signal.aborted) {
-        answer.textContent = 'Rocky couldn’t answer. Try again shortly.';
+        liveChat = false; // no server reachable: say so once and stop retrying
+        answer.textContent = NO_SERVER;
       }
     } finally {
       if (request === controller) {

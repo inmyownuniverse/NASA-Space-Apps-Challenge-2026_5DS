@@ -7,6 +7,9 @@
   "description": "Ocean currents coloured by surface temperature. Cold water is blue, then green and yellow, and the warmest water is red.",
   "crop": { "x": 0, "y": 0, "w": 1280, "h": 600 },
   "grid": { "w": 32, "h": 16 },
+  "latMax": 90,
+  "latMin": -78.75,
+  "_lat": "Latitude covered by the crop: the video spans 90 N to 90 S over 640 rows and the crop keeps the top 600, so the map ends at 78.75 S.",
   "colorbar": {
     "unit": "°C",
     "stops": [

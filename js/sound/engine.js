@@ -337,6 +337,28 @@ export function setVolume(db) {
   if (listener) listener.volume.rampTo(db, 0.05);
 }
 
+// ---------- guide chirp ----------
+
+let chirpSynth = null;
+
+/**
+ * A short, original chord chirp for the guide character: a quick rising arpeggio and a little
+ * two-note answer, made with Tone.js (no sound file). Plays through the master chain, so it
+ * follows the volume slider and the limiter. Returns false if audio hasn't started yet.
+ */
+export function playChirp() {
+  if (!started) return false;
+  chirpSynth ??= new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.15 },
+    volume: -16,
+  }).connect(master);
+  const t = Tone.now() + lookAhead();
+  ['C5', 'E5', 'G5', 'C6'].forEach((note, i) => chirpSynth.triggerAttackRelease(note, 0.09, t + i * 0.055, 0.7));
+  chirpSynth.triggerAttackRelease(['E6', 'G6'], 0.14, t + 0.25, 0.5);
+  return true;
+}
+
 /** Dip the music a little while speech is playing (true), or bring it back (false). */
 export function duckMusic(on) {
   if (!duck) return;

@@ -93,6 +93,10 @@
         <div class="explore-toolbar">
           <h2 id="explore-title">Explore by location</h2>
           <label>Dataset <select id="explore-dataset"></select></label>
+          <div class="explore-view" role="group" aria-label="Map view">
+            <button type="button" id="explore-view-globe" aria-pressed="true">Globe</button>
+            <button type="button" id="explore-view-flat" aria-pressed="false">Flat map</button>
+          </div>
         </div>
         <div class="explore-zoom" aria-label="Map zoom">
           <button type="button" data-globe-zoom="in" aria-label="Zoom in">+</button>
@@ -109,7 +113,7 @@
       </div>
       <div class="explore-panels">
         <section><h3>Marked locations</h3><div id="explore-pins"></div></section>
-        <section><h3>Selected location</h3><p id="explore-selection">Choose a point on the globe or from the list.</p></section>
+        <section><h3>Selected location</h3><p id="explore-selection">Choose a point on the globe or from the list.</p><div id="explore-proof-host"></div></section>
       </div>
     </section>
     <div id="jukebox" class="layout" hidden>
