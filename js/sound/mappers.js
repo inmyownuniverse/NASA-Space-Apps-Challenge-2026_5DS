@@ -258,8 +258,8 @@ export function layers(features, cfg, inst, time) {
     const gain = voice.layerGains[name];
     if (!layerInst || !gain) return;
 
-    // TODO(Aahana): features.layers[name] is a placeholder until the analyzer measures layers.
-    const strength = Math.min(1, hasLayers ? (features.layers[name] ?? 0) : (s.placeholderStrength ?? 0.3));
+    const dataKey = name === 'smoke' ? 'black_carbon' : name === 'salt' ? 'sea_salt' : name;
+    const strength = Math.min(1, hasLayers ? (features.layers[dataKey] ?? features.layers[name] ?? 0) : (s.placeholderStrength ?? 0.3));
     const db = strength <= silentBelow ? SILENT_DB : quiet + (loud - quiet) * strength;
     gain.volume.rampTo(db, s.layerFade ?? 0.5);
     if (strength > st.loudestStrength) { st.loudest = name; st.loudestStrength = strength; }
