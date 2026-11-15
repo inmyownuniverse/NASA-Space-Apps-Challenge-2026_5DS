@@ -4,7 +4,7 @@
   "source": "https://svs.gsfc.nasa.gov/3912/",
   "video": "media/sst.mp4",
   "dates": "TODO: copy from SVS page",
-  "description": "Ocean currents coloured by surface temperature. Warm water is red, cold is blue.",
+  "description": "Ocean currents coloured by surface temperature. Cold water is blue, then green and yellow, and the warmest water is red.",
   "crop": { "x": 0, "y": 0, "w": 1280, "h": 600 },
   "grid": { "w": 32, "h": 16 },
   "colorbar": {
