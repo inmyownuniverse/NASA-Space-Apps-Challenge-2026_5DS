@@ -69,8 +69,8 @@ console.log('\n--- 1. Config and asset ---');
   assert(!!panel && panel.w === 190 && panel.h === 165, 'Bottom-right control panel is masked (190×165 at 1090,555)');
   assert(/clock|wheel/i.test(panel.note), 'Mask documents that it covers the clock and the year wheel');
 
-  assert(cfg.sound.mapper === 'events' && cfg.sound.instrument === 'drum' && cfg.sound.maxVoices === 4,
-    'Freia sound block preserved');
+  assert(cfg.sound.mapper === 'events' && cfg.sound.instrument === 'drum',
+    'Lightning keeps the events mapper and drum instrument; voice limits live in tuning.js');
   assert(Array.isArray(cfg.legend) && cfg.legend.length === 2, 'Celene legend preserved');
   assert(typeof cfg.description === 'string' && cfg.description.length > 0, 'Description preserved');
   assert(!/joule|watt|energy|irradiance/i.test(cfg.colorbar.unit),
@@ -126,8 +126,9 @@ globalThis.performance = { now: () => Date.now() };
 
 const { analyze, resetAnalyzer, emptyFeatures } = await import(`../js/analyzer.js?t=${Date.now()}`);
 
+const testVideo = {};
 function videoAt(t) {
-  return { readyState: 4, videoWidth: W, videoHeight: H, currentTime: t, _frame: frameAt(t) };
+  return Object.assign(testVideo, { readyState: 4, videoWidth: W, videoHeight: H, currentTime: t, _frame: frameAt(t) });
 }
 
 const strikeTotal = (f) => f.grid.reduce((a, v) => a + (typeof v === 'number' ? v : 0), 0);
@@ -209,8 +210,8 @@ console.log('\n--- 5. Core/halo grouping and false-positive rejection ---');
   // grouping test primes state with the empty sky and then shows the blobs.
   const run = (buf, t = 5) => {
     resetAnalyzer();
-    analyze({ readyState: 4, videoWidth: W, videoHeight: H, currentTime: t, _frame: blank() }, cfg);
-    return analyze({ readyState: 4, videoWidth: W, videoHeight: H, currentTime: t + 0.034, _frame: buf }, cfg);
+    analyze(Object.assign(testVideo, { readyState: 4, videoWidth: W, videoHeight: H, currentTime: t, _frame: blank() }), cfg);
+    return analyze(Object.assign(testVideo, { readyState: 4, videoWidth: W, videoHeight: H, currentTime: t + 0.034, _frame: buf }), cfg);
   };
 
   // reference colours from the audit
@@ -354,8 +355,8 @@ console.log('\n--- 7b. Globe boundary ---');
   const run = (frame) => {
     resetAnalyzer();
     const blank = new Uint8ClampedArray(W * H * 4); // baseline: no strikes anywhere
-    analyze({ readyState: 4, videoWidth: W, videoHeight: H, currentTime: 5, _frame: blank }, cfg);
-    return analyze({ readyState: 4, videoWidth: W, videoHeight: H, currentTime: 5.034, _frame: frame }, cfg);
+    analyze(Object.assign(testVideo, { readyState: 4, videoWidth: W, videoHeight: H, currentTime: 5, _frame: blank }), cfg);
+    return analyze(Object.assign(testVideo, { readyState: 4, videoWidth: W, videoHeight: H, currentTime: 5.034, _frame: frame }), cfg);
   };
 
   // inside the disc and outside it, on the same frame

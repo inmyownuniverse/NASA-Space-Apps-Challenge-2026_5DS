@@ -83,7 +83,8 @@ globalThis.performance = globalThis.performance ?? { now: () => Date.now() };
 const { analyze, resetAnalyzer, emptyFeatures } = await import(`../js/analyzer.js?t=${Date.now()}`);
 
 /** A video-like object whose single frame is `frame`. */
-const video = (t, frame) => ({ readyState: 4, videoWidth: W, videoHeight: H, currentTime: t, _frame: frame });
+const testVideo = {};
+const video = (t, frame) => Object.assign(testVideo, { readyState: 4, videoWidth: W, videoHeight: H, currentTime: t, _frame: frame });
 
 /** cfg with a different crop (and no absolute-frame masks, which do not apply). */
 function cropCfg(crop) {
@@ -379,17 +380,18 @@ console.log('\n--- 9. Seek and reset ---');
   paintRect(b, 700, 300, 300, 200, hsvToRgb(174.5, 0.6, 0.6));
 
   resetAnalyzer();
-  const first = analyze(video(10, a), { ...cfg, masks: [] });
-  const second = analyze(video(10.03, b), { ...cfg, masks: [] });
+  const unmaskedCfg = { ...cfg, masks: [] };
+  const first = analyze(video(10, a), unmaskedCfg);
+  const second = analyze(video(10.03, b), unmaskedCfg);
   assert(first.change === 0, `First frame of a run has change 0 (${first.change})`);
   assert(first.grid.some((v, i) => v !== second.grid[i]), 'A different frame produces a different grid');
   assert(second.change > 0.05, `Consecutive frames report change (${second.change.toFixed(3)})`);
 
-  const afterSeek = analyze(video(40, a), { ...cfg, masks: [] });
+  const afterSeek = analyze(video(40, a), unmaskedCfg);
   assert(afterSeek.change === 0, `A jump over 1.5 s resets change to 0 (${afterSeek.change})`);
 
   resetAnalyzer();
-  const afterReset = analyze(video(41, a), { ...cfg, masks: [] });
+  const afterReset = analyze(video(41, a), unmaskedCfg);
   assert(afterReset.change === 0, `resetAnalyzer() drops temporal state (${afterReset.change})`);
 
   // Deterministic: the same frame analysed twice gives the same numbers.

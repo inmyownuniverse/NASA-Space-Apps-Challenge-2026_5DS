@@ -1,8 +1,9 @@
+import { bindGlobeExplore } from './globe-explore.js';
 import { analyze, resetAnalyzer } from './analyzer.js';
 import { demoFeatures } from './sound/demo.js';
 import { tuned } from './sound/tuning.js';
 import { initLanding } from './landing.js';
-import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample, loadSymphony, playSymphonyFrame, setSymphonyLevel } from './sound/engine.js';
+import { initAudio, loadDataset, releaseAll, setVolume, playLegendSample, playProbe, loadSymphony, playSymphonyFrame, setSymphonyLevel } from './sound/engine.js';
 import * as player from './player.js';
 import { announce, speak, speakAndWait, formatTime } from './a11y.js';
 import { setEyesClosed } from './eyes.js';
@@ -91,6 +92,7 @@ function selectDataset(data) {
   byId('readout-value').textContent = 'Ready';
   loadDataset(data);
   player.load(data);
+  globeExplore.update(data, state.mode === 'explore' && state.view === 'jukebox');
 
   updateTime();
   announce(data.title + ' selected');
@@ -100,10 +102,13 @@ const layers = new Map();
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 let mixRun = 0;
 let mixTick = 0;
+let mixStarting = false;
+let mixStartedAt = 0;
 let recordingName = '';
 
 function seekMix(time) {
   symphony.elapsed = time;
+  mixStartedAt = performance.now() - time * 1000;
   resetAnalyzer();
   releaseAll();
   for (const { video } of layers.values()) {
@@ -114,7 +119,8 @@ function seekMix(time) {
 
 function stopMix() {
   mixRun++;
-  if (!symphony.running) return;
+  mixStarting = false;
+  if (!symphony.running) { updateControls(); return; }
   symphony.running = false;
   for (const { video } of layers.values()) video.pause();
   if (dataset) loadDataset(dataset);
@@ -123,28 +129,54 @@ function stopMix() {
 }
 
 async function toggleMix() {
-  if (!layers.size) return;
+  if (!layers.size || mixStarting) return;
   if (symphony.running) { stopMix(); return; }
   const run = ++mixRun;
-  await ensureAudio();
-  if (run !== mixRun || state.view !== 'symphony') return;
-  if (symphony.elapsed >= symphony.duration) seekMix(0);
-  player.pause();
-  loadSymphony(datasets);
-  resetAnalyzer();
-  symphony.running = true;
-  for (const [id, { video, level }] of layers) {
-    setSymphonyLevel(id, Number(level.value));
-    if (!motion.matches && !video.error) video.play().catch(() => {});
-  }
-  mixTick = 0;
+  mixStarting = true;
+  byId('mix-status').textContent = '';
   updateControls();
-  announce('Planet Symphony playing. Tiles identify analyzed video and sample layers.');
+  try {
+    await ensureAudio();
+    if (run !== mixRun || state.view !== 'symphony') return;
+    if (symphony.elapsed >= symphony.duration) seekMix(0);
+    player.pause();
+    loadSymphony(datasets);
+    resetAnalyzer();
+    symphony.running = true;
+    mixStartedAt = performance.now() - symphony.elapsed * 1000;
+    for (const [id, { video, level }] of layers) {
+      setSymphonyLevel(id, Number(level.value));
+      if (!motion.matches && !video.error) {
+        video.play().catch((error) => {
+          if (run !== mixRun || video.error) return;
+          console.error(error);
+          stopMix();
+          showMixError('A video could not start. Press Play Symphony to retry.');
+        });
+      }
+    }
+    mixTick = 0;
+    announce('Planet Symphony playing.');
+  } catch (error) {
+    console.error(error);
+    if (run === mixRun) {
+      stopMix();
+      showMixError('Audio could not start. Press Play Symphony to retry.');
+    }
+  } finally {
+    if (run === mixRun) mixStarting = false;
+    updateControls();
+  }
+}
+
+function showMixError(message) {
+  byId('mix-status').textContent = message;
+  announce(message);
 }
 
 function buildMixControls() {
   const container = byId('symphony-controls');
-  container.innerHTML = '<div class="transport"><button class="primary" data-action="toggle">Play Symphony</button><label class="timeline">Timeline<input type="range" data-mix-time min="0" max="1" step="0.1" value="0"></label><output></output></div><button data-mix-record>Record mix</button>';
+  container.innerHTML = '<div class="transport"><button class="primary" data-action="toggle">Play Symphony</button><label class="timeline">Timeline<input type="range" data-mix-time min="0" max="1" step="0.1" value="0"></label><output></output></div><button data-mix-record>Record mix</button><p id="mix-status"></p>';
   container.querySelector('[data-action="toggle"]').addEventListener('click', toggleMix);
   container.querySelector('[data-mix-time]').addEventListener('input', (e) => seekMix(Number(e.target.value)));
   container.querySelector('[data-mix-record]').addEventListener('click', toggleRecord);
@@ -152,7 +184,9 @@ function buildMixControls() {
 
 function updateControls() {
   const container = byId('symphony-controls');
-  container.querySelector('[data-action="toggle"]').textContent = symphony.running ? 'Pause Symphony' : 'Play Symphony';
+  const toggle = container.querySelector('[data-action="toggle"]');
+  toggle.disabled = !layers.size || mixStarting;
+  toggle.textContent = mixStarting ? 'Starting Symphony…' : symphony.running ? 'Pause Symphony' : 'Play Symphony';
   const timeline = container.querySelector('[data-mix-time]');
   timeline.max = symphony.duration || 1;
   timeline.value = symphony.elapsed;
@@ -172,7 +206,7 @@ function navigate() {
   legendRun++;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   player.pause();
-  if (dataset) player.setMode(state.view === 'jukebox' && state.mode === 'explore' ? 'explore' : 'play');
+  if (dataset) player.setMode('play');
   document.querySelectorAll('[data-mode]').forEach((button) => {
     button.setAttribute('aria-pressed', String(button.dataset.mode === state.mode));
   });
@@ -196,10 +230,12 @@ function navigate() {
   if (route === 'play') byId('legend-button').setAttribute('aria-haspopup', 'dialog');
   if (route !== 'play' && byId('play-dialog').open) byId('play-dialog').close();
   document.querySelector('.play-summary').hidden = state.view !== 'jukebox';
-  byId('jukebox').hidden = state.view !== 'jukebox';
+  byId('jukebox').hidden = state.view !== 'jukebox' || route === 'explore';
+  byId('explore-console').hidden = route !== 'explore';
+  globeExplore.update(dataset, route === 'explore');
   byId('symphony').hidden = route !== 'symphony';
   document.querySelectorAll('#site-navigation a').forEach((link) => {
-    if (link.hash === '#' + route) link.setAttribute('aria-current', 'page');
+    if (link.hash === '#' + (route === 'scan' ? 'play' : route)) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
   landing.setVisible(route === 'home');
@@ -211,10 +247,12 @@ document.querySelectorAll('[data-mode]').forEach((button) => {
   button.addEventListener('click', () => { location.hash = button.dataset.mode; });
 });
 
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', (event) => {
+  const workspace = ['#play', '#scan'];
+  const sameWorkspace = workspace.includes(new URL(event.oldURL).hash) && workspace.includes(new URL(event.newURL).hash);
   const previousFocus = document.activeElement;
   navigate();
-  window.scrollTo(0, 0);
+  if (!sameWorkspace) window.scrollTo(0, 0);
   if (previousFocus?.closest('#main [hidden]')) byId('main').focus();
 });
 
@@ -346,7 +384,7 @@ function stopAll() {
 function updateTime() {
   const button = byId('play-btn');
   button.textContent = player.isScanning() ? 'Stop scan' : state.mode === 'scan' ? 'Start scan' : player.isPlaying() ? 'Pause' : 'Play';
-  button.dataset.playing = String(player.isPlaying());
+  button.dataset.playing = String(player.isPlaying() || player.isScanning());
   const t = player.currentTime();
   const d = player.duration();
   const scrub = byId('scrub');
@@ -360,14 +398,16 @@ function updateTime() {
 
 async function togglePlay() {
   if (!dataset) return;
+  const selected = dataset;
+  const mode = state.mode;
   await ensureAudio();
+  if (dataset !== selected || state.mode !== mode || state.view !== 'jukebox') return;
   if (player.isScanning()) player.setMode('play');
   else if (player.isPlaying()) player.pause();
   else if (state.mode === 'scan') player.setMode('scan');
   else {
-    const selected = dataset;
     if (byId('legend-first').checked && !legendHeard.has(selected.id) && !await playLegend()) return;
-    if (dataset !== selected || state.view !== 'jukebox') return;
+    if (dataset !== selected || state.mode !== mode || state.view !== 'jukebox') return;
     await player.play();
   }
   updateTime();
@@ -411,6 +451,7 @@ const MODES = ['play', 'scan', 'explore'];
 const SCRUB_STEP = 5;
 const VOLUME_STEP = 2;
 function onKey(e) {
+  if (state.mode === 'explore' && [' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
   if (state.view !== 'jukebox' || !dataset || playDialog.open || e.defaultPrevented) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
@@ -509,12 +550,11 @@ document.addEventListener('keydown', (event) => {
   if (!event.repeat) toggleMix();
 });
 
-let lastTick = performance.now();
 setInterval(() => {
   const now = performance.now();
   if (state.view === 'jukebox' && dataset) updateTime();
   if (symphony.running) {
-    symphony.elapsed = Math.min(symphony.duration, symphony.elapsed + (now - lastTick) / 1000);
+    symphony.elapsed = Math.min(symphony.duration, (now - mixStartedAt) / 1000);
     if (now >= mixTick) {
       const frames = {};
       for (const data of datasets) {
@@ -531,7 +571,6 @@ setInterval(() => {
     if (symphony.elapsed >= symphony.duration) { stopMix(); announce('Planet Symphony complete.'); }
     updateControls();
   }
-  lastTick = now;
 }, 100);
 
 async function json(url) {
@@ -573,8 +612,10 @@ async function start() {
   }));
   symphony.duration = Math.max(...datasets.map(({ duration }) => duration));
   renderLibrary();
+  globeExplore.setDatasets(datasets);
   renderShowcase();
   renderTiles();
+  updateControls();
   const params = new URLSearchParams(location.search);
   const id = params.get('dataset');
   const requested = datasets.find((item, index) => item.id === id || String(index + 1) === id);
@@ -601,6 +642,18 @@ const noteObserver = new IntersectionObserver((entries) => {
     target.classList.toggle('note-visible', isIntersecting && document.body.classList.contains('play-console'));
   });
 }, { threshold: 0.15 });
+
+const globeExplore = bindGlobeExplore({
+  video: byId('video'),
+  setFrameExplorer: (enabled) => player.setMode(enabled ? 'explore' : 'play'),
+  select: (id) => selectDataset(datasets.find((item) => item.id === id)),
+  async hear(data, value, column) {
+    await ensureAudio();
+    if (dataset === data && state.view === 'jukebox' && state.mode === 'explore') {
+      return playProbe(data, value, column);
+    }
+  },
+});
 
 navigate();
 

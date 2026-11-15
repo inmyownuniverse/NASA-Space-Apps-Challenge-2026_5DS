@@ -40,10 +40,11 @@ export function initLanding() {
     const travel = height - landing.offsetHeight;
     progress = preferences.matches || travel <= 0 ? 0 : clamp(-top / travel);
     const exit = smooth(clamp((progress - 0.68) / 0.32));
+    const showcaseBounds = showcase.getBoundingClientRect();
     home.style.setProperty('--flight-exit', exit);
     home.style.setProperty('--flight-copy', smooth(clamp(progress / 0.42)));
     home.style.setProperty('--flight-sides', smooth(clamp(progress / 0.32)));
-    const reveal = clamp((innerHeight - showcase.getBoundingClientRect().top) / (innerHeight * 0.48));
+    const reveal = clamp((innerHeight - showcaseBounds.top) / (innerHeight * 0.48));
     showcase.style.setProperty('--arrival', preferences.matches ? 1 : reveal);
     home.style.setProperty('--surface-progress', progress);
     scene?.update();

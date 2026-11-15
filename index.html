@@ -18,7 +18,6 @@
     <nav id="site-navigation" aria-label="Studio views">
       <a href="#home" aria-current="page">Home</a>
       <a href="#play">Play</a>
-      <a href="#scan">Scan</a>
       <a href="#explore">Explore</a>
       <a href="#symphony">Planet Symphony</a>
       <a href="add.html">Add visualization</a>
@@ -38,7 +37,7 @@
     <p class="hero-kicker">NASA EARTH OBSERVATIONS</p>
     <div class="hero-heading">
       <button class="orbit-arrow" id="previous-feature" aria-label="Previous feature">‹</button>
-      <h1 id="hero-title" class="hero-title">EARTH JUKEBOX</h1>
+      <h1 id="hero-title" class="hero-title"><span>EARTH</span> <span>JUKEBOX</span></h1>
       <button class="orbit-arrow" id="next-feature" aria-label="Next feature">›</button>
     </div>
     <p id="hero-subtitle">Listen to the planet</p>
@@ -87,6 +86,31 @@
       </div>
     </section>
     </div>
+    <section id="explore-console" hidden aria-labelledby="explore-title">
+      <div class="explore-map">
+        <div id="explore-globe"></div>
+        <div class="explore-toolbar">
+          <h2 id="explore-title">Explore by location</h2>
+          <label>Dataset <select id="explore-dataset"></select></label>
+        </div>
+        <div class="explore-zoom" aria-label="Map zoom">
+          <button type="button" data-globe-zoom="in" aria-label="Zoom in">+</button>
+          <button type="button" data-globe-zoom="out" aria-label="Zoom out">−</button>
+          <button type="button" data-globe-zoom="reset">Reset</button>
+        </div>
+        <p id="explore-map-status">Drag to rotate · Scroll to zoom · Select a point to hear it</p>
+      </div>
+      <div class="explore-metrics">
+        <div><span>Valid cells</span><strong id="explore-count">—</strong></div>
+        <div><span>Mean</span><strong id="explore-mean">—</strong></div>
+        <div><span>Maximum</span><strong id="explore-max">—</strong></div>
+        <div><span>Frame</span><strong id="explore-time">—</strong></div>
+      </div>
+      <div class="explore-panels">
+        <section><h3>Marked locations</h3><div id="explore-pins"></div></section>
+        <section><h3>Selected location</h3><p id="explore-selection">Choose a point on the globe or from the list.</p></section>
+      </div>
+    </section>
     <div id="jukebox" class="layout" hidden>
       <section class="play-summary" aria-labelledby="play-summary-title" hidden>
         <div class="play-heading">
@@ -128,7 +152,6 @@
         <div class="modes" role="group" aria-label="Exploration mode">
           <button data-mode="play" aria-pressed="true">Play</button>
           <button data-mode="scan" aria-pressed="false">Scan</button>
-          <button data-mode="explore" aria-pressed="false">Explore</button>
         </div>
       </section>
       <aside class="details" aria-label="Dataset information">
