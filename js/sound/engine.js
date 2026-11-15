@@ -351,11 +351,11 @@ export function playChirp() {
   chirpSynth ??= new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.005, decay: 0.12, sustain: 0, release: 0.15 },
-    volume: 2,
+    volume: -16,
   }).connect(master);
   const t = Tone.now() + lookAhead();
-  ['C5', 'E5', 'G5', 'C6'].forEach((note, i) => chirpSynth.triggerAttackRelease(note, 0.09, t + i * 0.055, 0.8));
-  chirpSynth.triggerAttackRelease(['E6', 'G6'], 0.14, t + 0.25, 0.6);
+  ['C5', 'E5', 'G5', 'C6'].forEach((note, i) => chirpSynth.triggerAttackRelease(note, 0.09, t + i * 0.055, 0.7));
+  chirpSynth.triggerAttackRelease(['E6', 'G6'], 0.14, t + 0.25, 0.5);
   return true;
 }
 
