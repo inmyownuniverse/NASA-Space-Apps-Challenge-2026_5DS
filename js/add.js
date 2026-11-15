@@ -21,6 +21,18 @@ const canvas = $('overlay');
 const ctx = canvas.getContext('2d');
 const num = (id) => Number($(id).value);
 
+/** Show a short message under step n (0 = top of the page) and read it out to screen readers. */
+function say(n, text, isError = false) {
+  const el = $('status-' + n);
+  if (el) {
+    el.textContent = text;
+    el.classList.toggle('step-error', isError);
+  }
+  announce(text);
+}
+
+const fail = (n, text) => say(n, text, true);
+
 // ---------- loading ----------
 
 $('file').addEventListener('change', () => {
@@ -29,8 +41,10 @@ $('file').addEventListener('change', () => {
   stop();
   fileName = file.name;
   const url = URL.createObjectURL(file);
+  const broken = () => fail(1, `Could not open "${file.name}". Try an MP4 or WebM video, or a PNG or JPG image.`);
   if (file.type.startsWith('image/')) {
     const img = new Image();
+    img.onerror = broken;
     img.onload = () => {
       const c = document.createElement('canvas');
       c.width = img.naturalWidth;
@@ -43,6 +57,7 @@ $('file').addEventListener('change', () => {
     img.src = url;
   } else {
     const v = $('video');
+    v.onerror = broken;
     v.src = url;
     v.addEventListener('loadeddata', () => ready(v, null), { once: true });
   }
@@ -67,7 +82,7 @@ function ready(src, img) {
   $('cy').value = 0;
   draw();
   update();
-  announce(`Loaded ${fileName}, ${source.videoWidth} by ${source.videoHeight} pixels. Next, mark the map box.`);
+  say(1, `Loaded ${fileName}, ${source.videoWidth} by ${source.videoHeight} pixels. Next: step 2, mark the map.`);
 }
 
 // ---------- marking the map box and the colour bar ----------
@@ -127,7 +142,7 @@ canvas.addEventListener('pointerup', () => {
   drag = null;
   setPicking(null);
   update();
-  announce(`Map box set: left ${$('cx').value}, top ${$('cy').value}, ${$('cw').value} by ${$('ch').value} pixels.`);
+  say(2, `Map area set: left ${$('cx').value}, top ${$('cy').value}, ${$('cw').value} by ${$('ch').value} pixels.`);
 });
 
 function draw() {
@@ -161,7 +176,7 @@ function frameData() {
 }
 
 function sampleBar() {
-  if (!source) { announce('Choose a video or image first.'); return; }
+  if (!source) { fail(3, 'Load an image or video in step 1 first.'); return; }
   const [x1, y1, x2, y2] = ['bx1', 'by1', 'bx2', 'by2'].map(num);
   const vmin = num('vmin'), vmax = num('vmax');
   const img = frameData();
@@ -189,7 +204,7 @@ function sampleBar() {
   $('stops-text').textContent = `Read ${STOPS} colours from ${vmin} to ${vmax} ${$('unit').value}.`;
   draw();
   update();
-  announce(`Colour bar read: ${STOPS} colours from ${vmin} to ${vmax} ${$('unit').value}. You can press Play now.`);
+  say(3, `Colour bar set: ${vmin} to ${vmax} ${$('unit').value} (${STOPS} colours read). ${matchText()} Next: step 4, press Play.`);
 }
 $('sample').addEventListener('click', sampleBar);
 
@@ -234,16 +249,22 @@ function buildCfg() {
 }
 
 let cfg = null;
+/** "314 of 512 map cells match the colour bar, average 16.8 °C." for the current settings. */
+function matchText() {
+  if (!source || !stops.length) return '';
+  const f = analyze(source, buildCfg());
+  const hits = f.grid.filter((v) => v !== null).length;
+  return `${hits} of ${f.grid.length} map cells match the colour bar` +
+    (f.mean !== null ? `, average ${f.mean.toFixed(1)} ${$('unit').value}.` : '.') +
+    (hits < 20 ? ' Very few match: check the map box, the colour bar ends, or raise the colour tolerance.' : '');
+}
+
 function update() {
   draw();
   cfg = buildCfg();
   $('json').value = JSON.stringify(cfg, null, 2);
   if (source && stops.length) {
-    const f = analyze(source, cfg);
-    const hits = f.grid.filter((v) => v !== null).length;
-    $('check').textContent = `Check: ${hits} of ${f.grid.length} map cells match the colour bar` +
-      (f.mean !== null ? `, average ${f.mean.toFixed(1)} ${cfg.colorbar.unit}.` : '.') +
-      (hits < 20 ? ' Very few match: check the map box, the colour bar ends or raise the colour tolerance.' : '');
+    $('check').textContent = 'Check: ' + matchText();
   }
   if (timer) loadDataset(cfg);
 }
@@ -254,8 +275,8 @@ for (const el of document.querySelectorAll('#steps input:not([type=file]), #step
 // ---------- play ----------
 
 async function play() {
-  if (!source) { announce('Choose a video or image first.'); return; }
-  if (!stops.length) { announce('Read the colour bar first (step 3).'); return; }
+  if (!source) { fail(4, 'Load an image or video in step 1 first, or press "Try with an example".'); return; }
+  if (!stops.length) { fail(4, 'Read the colour bar in step 3 first.'); return; }
   await initAudio();
   stop();
   cfg = buildCfg();
@@ -266,7 +287,7 @@ async function play() {
     const f = analyze(source, cfg);
     playFrame(f, cfg, source.currentTime ?? 0);
   }, STEP_MS);
-  announce(`Playing ${cfg.title}.`);
+  say(4, `Playing ${cfg.title}. Press Stop or Escape to stop.`);
 }
 
 function stop() {
@@ -277,8 +298,8 @@ function stop() {
 }
 
 $('play').addEventListener('click', play);
-$('stop').addEventListener('click', () => { stop(); announce('Stopped.'); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { stop(); setPicking(null); } });
+$('stop').addEventListener('click', () => { stop(); say(4, 'Stopped.'); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (timer) say(4, 'Stopped.'); stop(); setPicking(null); } });
 
 $('download').addEventListener('click', () => {
   update();
@@ -288,7 +309,59 @@ $('download').addEventListener('click', () => {
   a.download = `${cfg.id}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  announce(`Downloaded ${cfg.id}.json.`);
+  say(5, `Downloaded ${cfg.id}.json. Put it in datasets/ and add its name to datasets/index.json.`);
 });
+
+// ---------- one-click example: an SST frame with its colour bar ----------
+// The SST video has no colour bar in the frame, so the example draws the frame at 10 s with the
+// SST colour bar (tools/sst_colorbar.png) underneath, then fills in every step.
+const EXAMPLE = {
+  video: 'media/sst.mp4', at: 10, bar: 'tools/sst_colorbar.png', barX: 485, barY: 650,
+  size: [1280, 760], crop: [0, 0, 1280, 600], ends: [501, 678, 774, 678],
+  vmin: 0, vmax: 32, unit: '°C', tolerance: 75,
+  title: 'Sea Surface Temperature (example)', source: 'https://svs.gsfc.nasa.gov/3912/',
+};
+
+async function loadExample() {
+  stop();
+  say(0, 'Loading the example…');
+  try {
+    const v = document.createElement('video');
+    v.muted = true;
+    v.preload = 'auto';
+    v.src = EXAMPLE.video;
+    await new Promise((resolve, reject) => { v.onloadeddata = resolve; v.onerror = reject; });
+    v.currentTime = EXAMPLE.at;
+    await new Promise((resolve) => { v.onseeked = resolve; });
+    const bar = new Image();
+    bar.src = EXAMPLE.bar;
+    await bar.decode();
+    const c = document.createElement('canvas');
+    [c.width, c.height] = EXAMPLE.size;
+    const x = c.getContext('2d');
+    x.fillStyle = '#000';
+    x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(v, 0, 0);
+    x.drawImage(bar, EXAMPLE.barX, EXAMPLE.barY);
+    // The analyser expects a video; give the still image the same fields.
+    Object.assign(c, { readyState: 4, videoWidth: c.width, videoHeight: c.height, currentTime: 0 });
+    fileName = 'sst-example.mp4';
+    ready(c, { src: c.toDataURL('image/jpeg', 0.9) });
+    const set = (id, val) => { $(id).value = val; };
+    [['cx', 0], ['cy', 1], ['cw', 2], ['ch', 3]].forEach(([id, i]) => set(id, EXAMPLE.crop[i]));
+    [['bx1', 0], ['by1', 1], ['bx2', 2], ['by2', 3]].forEach(([id, i]) => set(id, EXAMPLE.ends[i]));
+    set('vmin', EXAMPLE.vmin); set('vmax', EXAMPLE.vmax); set('unit', EXAMPLE.unit);
+    set('maxdist', EXAMPLE.tolerance); set('title', EXAMPLE.title); set('source', EXAMPLE.source);
+    set('mapper', 'continuousField'); set('instrument', 'warmPad');
+    say(1, 'Loaded an SST frame, with its colour bar added underneath.');
+    say(2, 'Map area set: the map without the colour bar, 1280 by 600 pixels.');
+    sampleBar();
+    say(0, 'Example ready. Every step is filled in: press Play in step 4 to hear it.');
+    $('play').focus();
+  } catch {
+    fail(0, 'The example could not load. Open this page through a web server (Live Server or the live site).');
+  }
+}
+$('example').addEventListener('click', loadExample);
 
 update();

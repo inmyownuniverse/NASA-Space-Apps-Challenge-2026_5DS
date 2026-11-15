@@ -8,6 +8,14 @@
   <meta name="description" content="Turn any NASA Earth visualization into sound: mark the map and colour bar, then hear it and download its config.">
   <link rel="icon" type="image/svg+xml" href="media/rocket-cursor.svg">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Page-only additions on top of the shared styles in css/style.css */
+    .add-heading > div > p:first-child { border-left: 1px solid #56585d; padding-left: 1rem; color: var(--muted); }
+    .add-heading .row-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .75rem; }
+    .step-status { margin: .5rem 0 0; font-size: .9rem; color: #c8f2e8; }
+    .step-status:empty { display: none; }
+    .step-status.step-error { color: #ffb4a8; }
+  </style>
   <script type="module" src="js/add.js"></script>
   <script type="module">
     import { bindNavigation } from './js/navigation.js';
@@ -30,7 +38,15 @@
   <main class="shell add-workspace">
     <div class="add-heading">
       <div><p class="eyebrow">Earth observation · Setup</p><h1>Add a visualization</h1></div>
-      <p>Turn a NASA Earth visualization with a colour bar into music.</p>
+      <div>
+        <p>Turn a NASA Earth visualization with a colour bar into music. Follow the five steps, or try
+          the ready-made example first.</p>
+        <div class="row-buttons">
+          <button id="example" type="button">Try with an example</button>
+          <a href="index.html#play">Back to the jukebox</a>
+        </div>
+        <p id="status-0" class="step-status"></p>
+      </div>
     </div>
     <div class="add-layout">
     <section class="panel" aria-labelledby="preview-heading">
@@ -48,17 +64,19 @@
       <h2 id="steps-heading">Steps</h2>
 
       <fieldset>
-        <legend>1. Your visualization</legend>
+        <legend>1. Load an image or video</legend>
         <div class="fields">
           <label>Video or image file <input id="file" type="file" accept="video/*,image/*"></label>
           <label>Title <input id="title" type="text" value="My visualization"></label>
           <label>Source page <input id="source" type="url" placeholder="https://svs.gsfc.nasa.gov/..."></label>
         </div>
+        <p id="status-1" class="step-status"></p>
       </fieldset>
 
       <fieldset>
-        <legend>2. Map area (pixels)</legend>
-        <p class="step-help">Drag a box over the map on the preview, or type the numbers.</p>
+        <legend>2. Drag a box over the map</legend>
+        <p class="step-help">Press "Draw the map box", then drag over the map on the preview. Or type the
+          numbers (in pixels of the picture).</p>
         <div class="row-buttons"><button id="pick-box" type="button" aria-pressed="false">Draw the map box</button></div>
         <div class="fields">
           <label>Left <input id="cx" type="number" min="0" value="0"></label>
@@ -66,11 +84,13 @@
           <label>Width <input id="cw" type="number" min="1" value="1280"></label>
           <label>Height <input id="ch" type="number" min="1" value="720"></label>
         </div>
+        <p id="status-2" class="step-status"></p>
       </fieldset>
 
       <fieldset>
-        <legend>3. Colour bar</legend>
-        <p class="step-help">Click the low end of the colour bar, then the high end, and type the values at each end.</p>
+        <legend>3. Mark the colour bar and its values</legend>
+        <p class="step-help">Press the button, then click the low end of the colour bar and then the high
+          end. Type the value and unit printed at each end, then press "Read the colour bar".</p>
         <div class="row-buttons"><button id="pick-bar" type="button" aria-pressed="false">Click the two ends of the colour bar</button></div>
         <div class="fields">
           <label>Low end x <input id="bx1" type="number" value="0"></label>
@@ -85,10 +105,11 @@
         <div class="row-buttons"><button id="sample" type="button">Read the colour bar</button></div>
         <div id="gradient" class="gradient" aria-hidden="true"></div>
         <p id="stops-text" class="readout"></p>
+        <p id="status-3" class="step-status"></p>
       </fieldset>
 
       <fieldset>
-        <legend>4. Sound</legend>
+        <legend>4. Pick a sound and play</legend>
         <div class="fields">
           <label>Kind of data
             <select id="mapper">
@@ -116,13 +137,16 @@
           <button id="play" type="button">Play</button>
           <button id="stop" type="button">Stop</button>
         </div>
+        <p class="step-help">Escape also stops the sound.</p>
+        <p id="status-4" class="step-status"></p>
       </fieldset>
 
       <fieldset>
-        <legend>5. Save</legend>
+        <legend>5. Download the config</legend>
         <p class="step-help">Download the config, save it in <code>datasets/</code>, add its name to
           <code>datasets/index.json</code> and put the video in <code>media/</code>. It then shows up in the jukebox.</p>
         <div class="row-buttons"><button id="download" type="button">Download config</button></div>
+        <p id="status-5" class="step-status"></p>
         <label for="json" class="sr-only">Config JSON</label>
         <textarea id="json" readonly></textarea>
       </fieldset>
