@@ -53,6 +53,7 @@ export function load(newCfg) {
   els();
   pause();
   cfg = newCfg;
+  latest = null; // features of the previous dataset must not leak into Explore or summaries
   missing = false;
   simOffset = 0;
   lastT = -Infinity;

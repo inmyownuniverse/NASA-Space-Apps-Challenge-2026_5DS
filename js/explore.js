@@ -11,6 +11,8 @@ import { tuned } from './sound/tuning.js';
 import { valueRange } from './sound/scales.js';
 import { demoFeatures } from './sound/demo.js';
 import { announce, buzz } from './a11y.js';
+import { analyze } from './analyzer.js';
+import { latestFeatures, isPlaying } from './player.js';
 
 const POINTER_GAP_MS = 120; // at most one probe per 120 ms while dragging
 const ANNOUNCE_GAP_MS = 700;
@@ -28,6 +30,8 @@ const MISS = {
   line: 'Current line, no data here.',
   outside: 'This colour is outside the colour bar range.',
   sample: 'The sample data has nothing at this spot.',
+  masked: 'A label or panel covers this spot, so there is no data here.',
+  silent: 'This part of the video uses a different colour meaning, so it is left silent.',
 };
 
 function direction(col, row, gw, gh) {
@@ -67,6 +71,7 @@ function readSpot(video, cfg, vx, vy, col, row, t) {
     const value = demoFeatures(cfg, t).grid[row * cfg.grid.w + col];
     return { status: value === null ? 'sample' : 'ok', value, rgb: null, at: null, sample: true };
   }
+  if (cfg.extract?.mode) return readExtracted(video, cfg, vx, vy, col, row);
   // Copy a small square around the spot at full resolution (no scaling, so no blending).
   const r = SEARCH;
   const sx = Math.max(0, vx - r), sy = Math.max(0, vy - r);
@@ -78,6 +83,87 @@ function readSpot(video, cfg, vx, vy, col, row, t) {
   const px = wctx.getImageData(0, 0, sw, sh).data;
   const res = readPatch(px, sw, sh, vx - sx, vy - sy, cfg.colorbar.stops);
   return { ...res, at: [res.at[0] + sx, res.at[1] + sy], sample: false };
+}
+
+/** Colour of the pixel at (vx, vy), for the swatch. */
+function pixelAt(video, vx, vy) {
+  work.width = 1;
+  work.height = 1;
+  wctx.drawImage(video, vx, vy, 1, 1, 0, 0, 1, 1);
+  const d = wctx.getImageData(0, 0, 1, 1).data;
+  return [d[0], d[1], d[2]];
+}
+
+/**
+ * Datasets with an extractor (night lights, lightning, aerosols) are read by the analyser in its
+ * own way (brightness, flash detection, aerosol hues), not by a colour bar. So Explore shows the
+ * analyser's value for the grid cell: exactly the number the music uses. While the video plays
+ * that is the latest analysed frame; while paused the frame on screen is analysed once.
+ */
+function readExtracted(video, cfg, vx, vy, col, row) {
+  const f = isPlaying() && latestFeatures() ? latestFeatures() : analyze(video, cfg);
+  const rgb = pixelAt(video, vx, vy);
+  const mode = cfg.extract.mode;
+  if (f.grid.every((v) => v === null)) return { mode, status: 'silent', value: null, rgb, at: [vx, vy], sample: false };
+  const value = f.grid[row * cfg.grid.w + col];
+  if (value === null) return { mode, status: 'masked', value: null, rgb, at: [vx, vy], sample: false };
+  const spot = { mode, status: 'ok', value, rgb, at: [vx, vy], sample: Boolean(f.fake) };
+  if (mode === 'layers') spot.species = speciesAt(video, cfg, vx, vy);
+  return spot;
+}
+
+/**
+ * Which aerosol species colour is most common in a 7 x 7 patch: nearest legend hue within the
+ * analyser's hue tolerance, with the same brightness and colourfulness floors (cfg.extract).
+ * A simplified version of the analyser's per-pixel rule (it skips the ambiguity band).
+ */
+function speciesAt(video, cfg, vx, vy) {
+  const ex = cfg.extract;
+  const classes = Object.entries(ex.classes ?? {});
+  const half = Math.floor(PATCH / 2);
+  const sx = Math.max(0, vx - half), sy = Math.max(0, vy - half);
+  work.width = PATCH;
+  work.height = PATCH;
+  wctx.drawImage(video, sx, sy, PATCH, PATCH, 0, 0, PATCH, PATCH);
+  const px = wctx.getImageData(0, 0, PATCH, PATCH).data;
+  const counts = new Map();
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+    if (!d) continue;
+    let hue = mx === r ? ((g - b) / d) * 60 : mx === g ? ((b - r) / d) * 60 + 120 : ((r - g) / d) * 60 + 240;
+    if (hue < 0) hue += 360;
+    let best = null, bestD = (ex.hueTolerance ?? 26) + 1e-9;
+    for (const [key, c] of classes) {
+      const cmx = Math.max(...c.rgb), cd = cmx - Math.min(...c.rgb);
+      if (mx < (ex.brightnessFloor ?? 0.26) * cmx || d < (ex.chromaFloor ?? 0.25) * cd) continue;
+      let dh = Math.abs(hue - c.hue) % 360;
+      if (dh > 180) dh = 360 - dh;
+      if (dh <= bestD) { bestD = dh; best = key; }
+    }
+    if (best) counts.set(best, (counts.get(best) ?? 0) + 1);
+  }
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  return top ? (cfg.extract.classes[top[0]].label ?? top[0]) : null;
+}
+
+/** Plain sentence for an extractor reading (night lights, lightning, aerosols). */
+function extractedText(spot) {
+  const v = spot.value;
+  if (spot.mode === 'brightness') {
+    return v > 0
+      ? `Brightness index ${Math.round(v)} out of 100 (how bright the picture is here, not a physical unit).`
+      : 'Dark here: no city lights in this cell.';
+  }
+  if (spot.mode === 'flashes') {
+    return v > 0 ? `${v} lightning ${v === 1 ? 'strike' : 'strikes'} in this cell right now.` : 'No lightning strikes in this cell right now.';
+  }
+  if (spot.mode === 'layers') {
+    return v > 0
+      ? `${Math.round(v * 100)}% of this cell shows aerosol colour${spot.species ? `, mostly ${spot.species}` : ''}.`
+      : 'No aerosol colour in this cell.';
+  }
+  return `${fmt(v)}`;
 }
 
 // ---------- proof panel ----------
@@ -127,6 +213,15 @@ function updatePanel(panel, cfg, info) {
   q('.probe-min').textContent = `${fmt(min)} ${unit}`;
   q('.probe-max').textContent = `${fmt(max)} ${unit}`;
   const marker = q('.probe-marker');
+  if (spot.mode) {
+    // Extractor datasets: show the analyser's own reading for this cell.
+    marker.hidden = value === null;
+    if (value !== null) marker.style.left = `${Math.min(100, Math.max(0, ((value - min) / (max - min || 1)) * 100))}%`;
+    q('.probe-value').textContent = value === null ? (MISS[status] ?? MISS.land) : `${extractedText(spot)}${hot ? ' Hotspot.' : ''}`;
+    q('.probe-how').textContent = value === null ? '' : "This is the same value the music uses: the analyser's reading for this grid cell.";
+    q('.probe-note').textContent = `Note played: ${note ?? 'none'}`;
+    return;
+  }
   if (value === null) {
     marker.hidden = true;
     q('.probe-value').textContent = MISS[status] ?? MISS.land;
@@ -229,7 +324,9 @@ export function enableExplore(canvas, cfg) {
     lastSpot = spot;
     const value = spot.value;
     const hot = value !== null && value > hotAbove;
-    const note = value !== null ? playProbe(cfg, value, col) ?? noteForValue(cfg, value) : null;
+    // Extractor datasets: a zero reading (dark, no strikes, no aerosol) stays silent.
+    const audible = value !== null && !(spot.mode && value <= 0);
+    const note = audible ? playProbe(cfg, value, col) ?? noteForValue(cfg, value) : null;
     if (hot) buzz(30);
     drawCursor();
     updatePanel(panel, cfg, { col, row, spot, note, hot });
@@ -241,7 +338,9 @@ export function enableExplore(canvas, cfg) {
     const where = `Row ${row + 1}, column ${col + 1}, ${direction(col, row, gw, gh)}.`;
     const what = value === null
       ? MISS[spot.status] ?? MISS.land
-      : `${spot.status === 'nearest' ? 'Nearest ocean value, ' : ''}${fmt(value)} ${spokenUnit(cfg.colorbar.unit)}${note ? `, note ${note}` : ''}.${hot ? ' Hotspot.' : ''}${spot.sample ? ' Sample data.' : ''}`;
+      : spot.mode
+        ? `${extractedText(spot)}${note ? ` Note ${note}.` : ''}${hot ? ' Hotspot.' : ''}`
+        : `${spot.status === 'nearest' ? 'Nearest ocean value, ' : ''}${fmt(value)} ${spokenUnit(cfg.colorbar.unit)}${note ? `, note ${note}` : ''}.${hot ? ' Hotspot.' : ''}${spot.sample ? ' Sample data.' : ''}`;
     announce(`${where} ${what}`);
   }
 
