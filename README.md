@@ -77,6 +77,10 @@ Tools include Tone.js, Three.js, Web Audio, Web Speech, the Vibration API, ffmpe
 
 Optional colorbar tool: `pip install -r tools/requirements.txt`, then `python tools/sample_colorbar.py --help`.
 
+### Run Rocky’s science corner
+
+Keep your `GROQ_API` or `GROQ_API_KEY` in the ignored root `.env` file and run `node --env-file=.env server.mjs` from the repository root. Open http://127.0.0.1:8000/#play. Stop other servers on port 8000 first. Rocky’s introductions and science questions use the same-origin Groq endpoint. The browser sends the selected dataset ID and submitted question. Static GitHub Pages can show the built-in introductions, and live questions require hosting the Node server. Use the Node server when credentials are in this folder because generic static servers may expose the `.env` file.
+
 ## Accuracy and limits
 
 We want to be honest about what the sound can and can't tell you:

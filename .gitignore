@@ -12,3 +12,7 @@ tools/*.png
 media/nightlights.mp4
 .vscode/*
 !.vscode/extensions.json
+
+# Local API credentials
+.env
+.env.*

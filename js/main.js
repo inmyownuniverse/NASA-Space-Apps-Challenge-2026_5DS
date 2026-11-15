@@ -1,3 +1,4 @@
+import { bindRocky } from './rocky.js';
 import { bindGlobeExplore } from './globe-explore.js';
 import { analyze, resetAnalyzer } from './analyzer.js';
 import { demoFeatures } from './sound/demo.js';
@@ -72,9 +73,19 @@ function selectDataset(data) {
   byId('play-summary-description').textContent = data.description;
   const scale = byId('legend-scale');
   scale.hidden = data.id !== 'sst' || !data.colorbar?.stops?.length;
+  const stops = scale.hidden ? [] : data.colorbar.stops;
+  const palette = stops.length ? stops : Object.values(data.colorbar?.layers ?? {});
+  const colors = palette.length > 1 ? palette.map(({ rgb }) => 'rgb(' + rgb.join(', ') + ')') : [data.accent, '#f2f5f8', data.accent];
+  byId('legend-wave-colors').replaceChildren(...colors.map((color, index) => {
+    const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop.setAttribute('offset', index / (colors.length - 1));
+    stop.setAttribute('stop-color', color);
+    return stop;
+  }));
   if (!scale.hidden) {
-    const colors = data.colorbar.stops.map(({ rgb }) => 'rgb(' + rgb.join(', ') + ')');
     scale.style.setProperty('--legend-colors', colors.join(', '));
+    byId('legend-low').textContent = stops[0].value + ' ' + data.colorbar.unit;
+    byId('legend-high').textContent = stops.at(-1).value + ' ' + data.colorbar.unit;
   }
   byId('dataset-notes').disabled = false;
   byId('mapping').textContent = data.mapping;
@@ -89,9 +100,11 @@ function selectDataset(data) {
   }));
   const video = byId('video');
   video.poster = data.preview ?? '';
+  resetReadoutTimeline();
   byId('readout-value').textContent = 'Ready';
   loadDataset(data);
   player.load(data);
+  updateRocky(data, state.view === 'jukebox' && state.mode === 'play');
   globeExplore.update(data, state.mode === 'explore' && state.view === 'jukebox');
 
   updateTime();
@@ -202,7 +215,10 @@ function navigate() {
   const requested = location.hash.slice(1);
   const route = routes.includes(requested) ? requested : 'home';
   state.view = route === 'home' || route === 'symphony' ? route : 'jukebox';
-  if (state.view === 'jukebox') state.mode = route;
+  if (state.view === 'jukebox' && state.mode !== route) {
+    state.mode = route;
+    resetReadoutTimeline();
+  }
   legendRun++;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   player.pause();
@@ -234,6 +250,7 @@ function navigate() {
   byId('explore-console').hidden = route !== 'explore';
   globeExplore.update(dataset, route === 'explore');
   byId('symphony').hidden = route !== 'symphony';
+  updateRocky(dataset, route === 'play');
   document.querySelectorAll('#site-navigation a').forEach((link) => {
     if (link.hash === '#' + (route === 'scan' ? 'play' : route)) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
@@ -385,6 +402,7 @@ function updateTime() {
   const button = byId('play-btn');
   button.textContent = player.isScanning() ? 'Stop scan' : state.mode === 'scan' ? 'Start scan' : player.isPlaying() ? 'Pause' : 'Play';
   button.dataset.playing = String(player.isPlaying() || player.isScanning());
+  byId('legend-button').closest('.sonic-legend').dataset.playing = button.dataset.playing;
   const t = player.currentTime();
   const d = player.duration();
   const scrub = byId('scrub');
@@ -654,6 +672,39 @@ const globeExplore = bindGlobeExplore({
     }
   },
 });
+
+const readoutTimeline = byId('readout-timeline');
+let lastReadingTime = -Infinity;
+
+function resetReadoutTimeline() {
+  readoutTimeline.replaceChildren();
+  lastReadingTime = -Infinity;
+}
+
+new MutationObserver(() => {
+  if (!['play', 'scan'].includes(state.mode) || state.view !== 'jukebox') return;
+  const reading = byId('readout-value').textContent.trim();
+  if (!reading || reading === 'Ready') return;
+  const time = player.currentTime();
+  if (time < lastReadingTime) resetReadoutTimeline();
+  if (state.mode === 'play' && time - lastReadingTime < 1) return;
+  if (state.mode === 'scan' && !reading.startsWith('Column ')) return;
+
+  const entry = document.createElement('li');
+  const event = document.createElement('div');
+  event.className = 'readout-event';
+  const label = document.createElement('strong');
+  const column = /^Column (\d+) of \d+, west to east:\s*/.exec(reading);
+  label.textContent = column ? 'Column ' + column[1] : formatTime(time);
+  const summary = column ? reading.slice(column[0].length) : reading.replace(/^\d+:\d+:\s*/, '');
+  event.append(label, document.createTextNode(summary));
+  entry.append(event);
+  readoutTimeline.append(entry);
+  if (readoutTimeline.children.length > 5) readoutTimeline.firstElementChild.remove();
+  lastReadingTime = time;
+}).observe(byId('readout-value'), { childList: true, characterData: true, subtree: true });
+
+const updateRocky = bindRocky();
 
 navigate();
 
